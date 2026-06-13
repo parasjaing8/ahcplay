@@ -1,0 +1,4 @@
+-keep class org.videolan.** { *; }
+-keep class com.aihomecloud.ahcplayer.data.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
