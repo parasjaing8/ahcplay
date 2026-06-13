@@ -1,6 +1,7 @@
 package com.aihomecloud.ahcplayer.player
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -27,6 +28,7 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_SOURCE_ID = "extra_source_id"
         private const val HIDE_CONTROLS_DELAY_MS = 4000L
+        private const val HIDE_SEEK_INDICATOR_DELAY_MS = 1500L
         private const val SEEK_STEP_MS = 10_000L
         private const val PROGRESS_UPDATE_INTERVAL_MS = 500L
         private const val HISTORY_SAVE_INTERVAL_MS = 30_000L
@@ -46,6 +48,7 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var btnAudioTrack: ImageButton
     private lateinit var btnSubTrack: ImageButton
     private lateinit var tvSpeed: TextView
+    private lateinit var seekIndicator: TextView
 
     private lateinit var uri: String
     private lateinit var title: String
@@ -57,6 +60,7 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var playbackSpeed = 1.0f
     private val handler = Handler(Looper.getMainLooper())
     private val hideControlsRunnable = Runnable { hideControls() }
+    private val hideSeekIndicatorRunnable = Runnable { seekIndicator.visibility = View.GONE }
     private var isSeeking = false
 
     private val progressRunnable = object : Runnable {
@@ -107,7 +111,6 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
             when (event.type) {
                 MediaPlayer.Event.Playing -> runOnUiThread {
                     btnPlayPause.setImageResource(android.R.drawable.ic_media_pause)
-                    // Seek to resume position once after first play
                     if (resumePositionMs > 0 && surfaceReady) {
                         mediaPlayer.time = resumePositionMs
                         resumePositionMs = 0L
@@ -128,7 +131,6 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         surfaceView.holder.addCallback(this)
 
-        // Load existing history for resume
         lifecycleScope.launch {
             val existing = AppDatabase.get(this@PlayerActivity).watchHistoryDao().getByUri(uri)
             if (existing != null && existing.positionMs > 5_000L) {
@@ -210,7 +212,6 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun setupSeekBar() {
-        // SeekBar is display-only on TV — D-pad seeking handled via onKeyDown
         seekBar.isFocusable = false
         seekBar.isFocusableInTouchMode = false
     }
@@ -219,8 +220,8 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
         btnPlayPause.setOnClickListener { togglePlayPause() }
         btnRewind.setOnClickListener { seek(-SEEK_STEP_MS) }
         btnFastForward.setOnClickListener { seek(SEEK_STEP_MS) }
-        btnAudioTrack.setOnClickListener { cycleAudioTrack() }
-        btnSubTrack.setOnClickListener { cycleSubtitleTrack() }
+        btnAudioTrack.setOnClickListener { showAudioTrackDialog() }
+        btnSubTrack.setOnClickListener { showSubTrackDialog() }
         tvSpeed.setOnClickListener { cycleSpeed() }
     }
 
@@ -233,29 +234,51 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val duration = mediaPlayer.length.takeIf { it > 0 } ?: return
         val newTime = (mediaPlayer.time + deltaMs).coerceIn(0L, duration)
         mediaPlayer.time = newTime
-        showControls()
+        showSeekIndicator(newTime)
     }
 
-    private fun cycleAudioTrack() {
+    private fun showSeekIndicator(posMs: Long) {
+        seekIndicator.text = msToTime(posMs)
+        seekIndicator.visibility = View.VISIBLE
+        handler.removeCallbacks(hideSeekIndicatorRunnable)
+        handler.postDelayed(hideSeekIndicatorRunnable, HIDE_SEEK_INDICATOR_DELAY_MS)
+    }
+
+    private fun showAudioTrackDialog() {
         val tracks = mediaPlayer.audioTracks ?: return
+        if (tracks.isEmpty()) {
+            Toast.makeText(this, "No audio tracks", Toast.LENGTH_SHORT).show()
+            return
+        }
         val current = mediaPlayer.audioTrack
-        val idx = tracks.indexOfFirst { it.id == current }
-        val next = tracks[(idx + 1) % tracks.size]
-        mediaPlayer.audioTrack = next.id
-        Toast.makeText(this, "Audio: ${next.name}", Toast.LENGTH_SHORT).show()
-        showControls()
+        val names = tracks.map { it.name }.toTypedArray()
+        val checkedIdx = tracks.indexOfFirst { it.id == current }.coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle("Audio Track")
+            .setSingleChoiceItems(names, checkedIdx) { dialog, idx ->
+                mediaPlayer.audioTrack = tracks[idx].id
+                dialog.dismiss()
+                showControls()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
-    private fun cycleSubtitleTrack() {
+    private fun showSubTrackDialog() {
         val tracks = mediaPlayer.spuTracks ?: emptyArray()
         val ids = intArrayOf(-1) + tracks.map { it.id }.toIntArray()
         val names = arrayOf("None") + tracks.map { it.name }.toTypedArray()
         val current = mediaPlayer.spuTrack
-        val idx = ids.indexOfFirst { it == current }.takeIf { it >= 0 } ?: 0
-        val nextIdx = (idx + 1) % ids.size
-        mediaPlayer.spuTrack = ids[nextIdx]
-        Toast.makeText(this, "Sub: ${names[nextIdx]}", Toast.LENGTH_SHORT).show()
-        showControls()
+        val checkedIdx = ids.indexOfFirst { it == current }.takeIf { it >= 0 } ?: 0
+        AlertDialog.Builder(this)
+            .setTitle("Subtitle Track")
+            .setSingleChoiceItems(names, checkedIdx) { dialog, idx ->
+                mediaPlayer.spuTrack = ids[idx]
+                dialog.dismiss()
+                showControls()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun cycleSpeed() {
@@ -267,12 +290,11 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
         showControls()
     }
 
-    @SuppressLint("ClickableViewAccessibility")
     private fun showControls() {
         controlsLayout.visibility = View.VISIBLE
         controlsVisible = true
-        handler.removeCallbacks(hideControlsRunnable)
-        handler.postDelayed(hideControlsRunnable, HIDE_CONTROLS_DELAY_MS)
+        controlsLayout.post { btnPlayPause.requestFocus() }
+        resetHideTimer()
     }
 
     private fun hideControls() {
@@ -280,49 +302,49 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
         controlsVisible = false
     }
 
-    // Intercept D-pad before any child View (SeekBar, buttons) can consume it
+    private fun resetHideTimer() {
+        handler.removeCallbacks(hideControlsRunnable)
+        handler.postDelayed(hideControlsRunnable, HIDE_CONTROLS_DELAY_MS)
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
-            val handled = onKeyDown(event.keyCode, event)
-            if (handled) return true
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_BACK             -> { saveHistory(); finish(); return true }
+                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE  -> { togglePlayPause(); return true }
+                KeyEvent.KEYCODE_MEDIA_PLAY        -> { mediaPlayer.play(); showControls(); return true }
+                KeyEvent.KEYCODE_MEDIA_PAUSE       -> { mediaPlayer.pause(); showControls(); return true }
+                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { seek(SEEK_STEP_MS); return true }
+                KeyEvent.KEYCODE_MEDIA_REWIND      -> { seek(-SEEK_STEP_MS); return true }
+            }
+            if (!controlsVisible) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> seek(SEEK_STEP_MS)
+                    KeyEvent.KEYCODE_DPAD_LEFT  -> seek(-SEEK_STEP_MS)
+                    else                        -> showControls()
+                }
+                return true
+            }
+            // Controls visible: reset hide timer and let view system handle focus/click
+            resetHideTimer()
         }
         return super.dispatchKeyEvent(event)
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        return when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                if (controlsVisible) togglePlayPause() else showControls(); true
-            }
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { togglePlayPause(); true }
-            KeyEvent.KEYCODE_MEDIA_PLAY -> { mediaPlayer.play(); showControls(); true }
-            KeyEvent.KEYCODE_MEDIA_PAUSE -> { mediaPlayer.pause(); showControls(); true }
-            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                seek(SEEK_STEP_MS); true
-            }
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                seek(-SEEK_STEP_MS); true
-            }
-            KeyEvent.KEYCODE_DPAD_UP -> { showControls(); true }
-            KeyEvent.KEYCODE_DPAD_DOWN -> { showControls(); true }
-            KeyEvent.KEYCODE_BACK -> { saveHistory(); finish(); true }
-            else -> false
-        }
-    }
-
     private fun bindViews() {
-        surfaceView = findViewById(R.id.surface_view)
-        controlsLayout = findViewById(R.id.controls_layout)
-        btnPlayPause = findViewById(R.id.btn_play_pause)
-        btnRewind = findViewById(R.id.btn_rewind)
-        btnFastForward = findViewById(R.id.btn_fast_forward)
-        seekBar = findViewById(R.id.seek_bar)
-        tvPosition = findViewById(R.id.tv_position)
-        tvDuration = findViewById(R.id.tv_duration)
-        tvTitle = findViewById(R.id.tv_title)
-        btnAudioTrack = findViewById(R.id.btn_audio_track)
-        btnSubTrack = findViewById(R.id.btn_sub_track)
-        tvSpeed = findViewById(R.id.tv_speed)
+        surfaceView     = findViewById(R.id.surface_view)
+        controlsLayout  = findViewById(R.id.controls_layout)
+        btnPlayPause    = findViewById(R.id.btn_play_pause)
+        btnRewind       = findViewById(R.id.btn_rewind)
+        btnFastForward  = findViewById(R.id.btn_fast_forward)
+        seekBar         = findViewById(R.id.seek_bar)
+        tvPosition      = findViewById(R.id.tv_position)
+        tvDuration      = findViewById(R.id.tv_duration)
+        tvTitle         = findViewById(R.id.tv_title)
+        btnAudioTrack   = findViewById(R.id.btn_audio_track)
+        btnSubTrack     = findViewById(R.id.btn_sub_track)
+        tvSpeed         = findViewById(R.id.tv_speed)
+        seekIndicator   = findViewById(R.id.seek_indicator)
     }
 
     override fun onDestroy() {
