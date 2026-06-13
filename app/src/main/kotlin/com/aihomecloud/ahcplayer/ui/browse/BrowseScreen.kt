@@ -73,7 +73,17 @@ fun BrowseScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = android.net.Uri.decode(currentUri.substringAfterLast('/')).ifEmpty { "Media" },
+                text = run {
+                    val parsed = android.net.Uri.parse(currentUri)
+                    if (!vm.canGoBack) {
+                        parsed.getQueryParameter("user")?.ifEmpty { null }
+                            ?: parsed.getQueryParameter("share")
+                            ?: "Media"
+                    } else {
+                        val seg = parsed.pathSegments.lastOrNull { it.isNotEmpty() }.orEmpty()
+                        android.net.Uri.decode(seg).ifEmpty { "Media" }
+                    }
+                },
                 style = MaterialTheme.typography.headlineLarge,
                 color = TextPrimary,
                 modifier = Modifier.weight(1f)

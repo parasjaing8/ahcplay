@@ -105,6 +105,7 @@ class BrowseViewModel(app: Application) : AndroidViewModel(app) {
             val user = query.split("&").firstOrNull { it.startsWith("user=") }
                 ?.removePrefix("user=").orEmpty()
             ahcRepo.listFiles(host, port, nasPath, share, user)
+                .filter { it.name.isNotEmpty() && !it.name.startsWith(".") && '/' !in it.name }
         } else {
             SmbBrowser.browse(getApplication(), uri)
         }
