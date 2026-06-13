@@ -9,6 +9,9 @@ data class MediaMetadata(
     val displayTitle: String,
     val year: Int?,
     val posterUrl: String?,
+    val backdropUrl: String?,
+    val genre: String?,
+    val mediaType: String?,
     val overview: String?
 )
 
@@ -33,6 +36,9 @@ class MetadataRepository(context: Context) {
                 displayTitle = best.displayTitle.ifEmpty { parsed.title },
                 year = best.year ?: parsed.year,
                 posterUrl = best.posterUrl(),
+                backdropUrl = best.backdropUrl(),
+                genre = best.genreLabel(),
+                mediaType = best.mediaTypeLabel(),
                 overview = best.overview
             )
             dao.upsert(entity)
@@ -49,6 +55,9 @@ class MetadataRepository(context: Context) {
             displayTitle = parsed.title,
             year = parsed.year,
             posterUrl = null,
+            backdropUrl = null,
+            genre = null,
+            mediaType = if (parsed.isTvShow) "Series" else "Movie",
             overview = null
         )
         dao.upsert(entity)
@@ -59,6 +68,9 @@ class MetadataRepository(context: Context) {
         displayTitle = displayTitle,
         year = year,
         posterUrl = posterUrl,
+        backdropUrl = backdropUrl,
+        genre = genre,
+        mediaType = mediaType,
         overview = overview
     )
 }

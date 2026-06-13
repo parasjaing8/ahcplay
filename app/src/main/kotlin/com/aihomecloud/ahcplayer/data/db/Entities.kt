@@ -33,6 +33,9 @@ data class MediaMetadataEntity(
     val displayTitle: String,
     val year: Int?,
     val posterUrl: String?,
+    val backdropUrl: String?,
+    val genre: String?,
+    val mediaType: String?,
     val overview: String?,
     val cachedAt: Long = System.currentTimeMillis()
 )
