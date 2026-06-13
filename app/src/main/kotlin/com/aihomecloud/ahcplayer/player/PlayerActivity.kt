@@ -291,9 +291,12 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun showControls() {
+        val wasHidden = !controlsVisible
         controlsLayout.visibility = View.VISIBLE
         controlsVisible = true
-        controlsLayout.post { btnPlayPause.requestFocus() }
+        if (wasHidden) {
+            controlsLayout.post { btnPlayPause.requestFocus() }
+        }
         resetHideTimer()
     }
 
