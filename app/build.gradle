@@ -1,8 +1,16 @@
+import java.util.Properties
+
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.compose'
     id 'com.google.devtools.ksp'
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localProperties.load(new FileInputStream(localPropertiesFile))
 }
 
 android {
@@ -15,7 +23,7 @@ android {
         targetSdk 35
         versionCode 1
         versionName "1.0"
-        buildConfigField "String", "TMDB_API_KEY", "\"9e38bacf9c599f1733a98e60c28c134b\""
+        buildConfigField "String", "TMDB_API_KEY", "\"${localProperties.getProperty('tmdb.api.key', '')}\""
     }
 
     buildTypes {
