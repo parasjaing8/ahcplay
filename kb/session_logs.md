@@ -56,3 +56,34 @@
 - Pushed `main` to both `chaitraparas/ahcplay` (origin, account-switch) and `parasjaing8/ahcplay`
   (mirror) - single commit `231d7cc` (29 files, +1004/-202).
 
+## 2026-06-14 - Critical Base64 crash fix + Play Store listing assets - `e5c4f75`, `16253dc`
+
+- **Found and fixed a release-blocking crash**: `spkiPin()` in `AhcTls.kt` used
+  `java.util.Base64` (API 26+) inside the TOFU TLS cert-pinning path, called on every AHC
+  NAS connection. `minSdk` is 23, so on Android 6.0-7.1 (API 23-25) this threw
+  `NoClassDefFoundError` on the OkHttp dispatcher thread immediately after profile
+  selection - the app silently died and the Fire TV launcher took over (initially looked
+  like the app was "switching to Prime Video"). Switched to `android.util.Base64` with
+  `NO_WRAP` (format-compatible with the previous encoding). Verified via rebuild +
+  reinstall on Fire TV (API 25, 192.168.0.214:5555): `dumpsys activity activities |
+  grep mResumedActivity` now stays on `MainActivity` after profile selection - `e5c4f75`.
+- Investigated a follow-on HTTP 503 ("No external storage mounted") seen on the
+  "Prutha" profile's AHC source after the fix - confirmed via direct curl to the NAS
+  that this is the Rock Pi's external USB/NVMe drive currently unmounted, not an app
+  bug. The Retry-button error state is working as designed; no code change.
+- Added Play Store listing assets (`kb/store/`): `listing.md` (title/short/full
+  description), `icon-512.png`, `feature-graphic-1024x500.png`,
+  `tv-banner-1280x720.png`, two device screenshots (Who's Watching profile picker,
+  Continue Watching/resume card from "Prutha"'s BrowseScreen), and
+  `scripts/generate_store_assets.py` - `16253dc`.
+- Wrote and published the privacy policy + support pages to
+  `chaitraparas/aihomecloud-web` (`/ahcplay/privacy`, `/ahcplay/support`) and added an
+  AHC Player card to the site homepage, via `gh api repos/.../contents` (Contents API)
+  after `git push` to that repo hung on the `osxkeychain` credential helper - commits
+  `2a6440e`, `5987e03`, `3e6e8f4`.
+- Backed up `release.jks` + `keystore.properties` to `~/.secrets/ahcplay/` (outside git).
+- **Outstanding**: `app-release.aab` (built in the prior session phase) predates the
+  Base64 fix and must be rebuilt via `./gradlew bundleRelease` before Play Store
+  submission. Pushed `main` to both `chaitraparas/ahcplay` (origin) and
+  `parasjaing8/ahcplay` (mirror, account-switch).
+
