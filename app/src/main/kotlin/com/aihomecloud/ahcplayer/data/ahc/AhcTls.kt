@@ -1,11 +1,11 @@
 package com.aihomecloud.ahcplayer.data.ahc
 
+import android.util.Base64
 import okhttp3.OkHttpClient
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
-import java.util.Base64
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
@@ -13,8 +13,9 @@ import javax.net.ssl.X509TrustManager
 
 /** SHA-256 hash of a certificate's public key (SPKI), base64-encoded. */
 fun spkiPin(cert: X509Certificate): String =
-    Base64.getEncoder().encodeToString(
-        MessageDigest.getInstance("SHA-256").digest(cert.publicKey.encoded)
+    Base64.encodeToString(
+        MessageDigest.getInstance("SHA-256").digest(cert.publicKey.encoded),
+        Base64.NO_WRAP
     )
 
 /**
