@@ -30,3 +30,29 @@
 - Verification: `assembleDebug` BUILD SUCCESSFUL, installed on Fire TV (192.168.0.214:5555). No ADB e2e walkthrough this session per new workflow rule (build+install+summary only, unless "e2e" requested).
 - Pushed `main` to both `chaitraparas/ahcplay` (origin, account-switch) and `parasjaing8/ahcplay` (mirror).
 
+## 2026-06-14 - P0+P1 Play Store audit fixes + internal/USB storage support - `231d7cc`
+
+- P0 (blockers, all fixed): TMDB key fully removed from BuildConfig/codebase (confirmed absent from
+  compiled dex); AHC connections TOFU cert-pinned via new `AhcTls.kt` + `AhcRepository.apiFor()`/
+  `certPinKey()`; release signing wired (`release.jks` + `keystore.properties`, gitignored - user
+  must back these up); Retrofit/OkHttp/Gson/Coil proguard keep rules added;
+  `fallbackToDestructiveMigration()` now debug-only.
+- P1 (all 10 items): new `SecurePrefs.kt` (shared EncryptedSharedPreferences-with-fallback,
+  `isEncrypted` flag surfaced as a Settings warning) used by `AhcRepository`/`AppPreferences`;
+  storage permission now requested lazily on first INTERNAL/USB source open with a denial dialog;
+  removed dead `HttpLoggingInterceptor` + dependency; `BrowseViewModel.fetchMetadata` uses
+  `_metadata.update {}` + `Semaphore(5)`; Rescan no longer wipes `media_metadata` up front - per-item
+  `forceRefresh` upsert with live "Scanned N" progress; `StorageHelper.getUsbVolumes()` moved to
+  `Dispatchers.IO`; `SmbBrowser` releases LibVLC on setup/browse failure (leak fix); `ExitDialog`
+  Yes/No D-pad focus properties fixed; a11y content descriptions added (PIN badge, PIN pad backspace).
+- Internal/USB local storage support (separate feature landed alongside the audit fixes): new
+  `SourceType.INTERNAL`/`USB`, `sources.enabled` column (DB migration 6->7), `LocalFileBrowser`,
+  `BrowseFetcher` abstraction, `LibraryScanner` for unified AHC/SMB/local scans; `HomeViewModel`
+  library stats converted to Flow-based (live updates); `AhcButton` focus shown via border.
+- Added `kb/ahcAudit14June.md` (full Play Store readiness audit, Opus). Added `.kotlin/` to
+  `.gitignore` (untracked build cache).
+- Verification: `assembleDebug` + `assembleRelease` both BUILD SUCCESSFUL, installed on Fire TV
+  (192.168.0.214:5555). No e2e ADB walkthrough this session per workflow rule.
+- Pushed `main` to both `chaitraparas/ahcplay` (origin, account-switch) and `parasjaing8/ahcplay`
+  (mirror) - single commit `231d7cc` (29 files, +1004/-202).
+
