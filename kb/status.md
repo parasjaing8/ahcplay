@@ -3,6 +3,7 @@
 - Branch: `main` (== `ahcCodex`, fast-forwarded to `027e68a`)
 - Explore/Browse TV UX modernization: implemented, reviewed, unused imports cleaned up
 - Who's Watching / Home screen redesign (JioHotstar-style profile picker): implemented, installed and verified on Fire TV
+- Settings: macOS-style sidebar/detail layout (Sources, Data, TMDB, About) with user-configurable TMDB API key; installed and screenshot-verified on Fire TV. Open: confirm Save/Clear button taps work via real remote (not just ADB).
 - Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 - Release APK: `app/build/outputs/apk/release/app-release-unsigned.apk`
 - Known tooling issue: Android lint crashes in Lifecycle and Compose detectors due to a Kotlin analysis API incompatibility.
