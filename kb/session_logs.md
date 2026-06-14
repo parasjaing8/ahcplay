@@ -19,4 +19,5 @@
 - Committed the Home screen redesign (JioHotstar-style profile picker: animated selection ring auto-opens last-used profile after 3s, blurred backdrop collage from `media_metadata`, movie/show counts) - `027e68a`. App was already installed and verified working on Fire TV from the prior session.
 - Fast-forward merged `ahcCodex` -> `main` (`30e4d83..027e68a`) and pushed both branches.
 - Repo/remote note: `origin` = `chaitraparas/ahcplay` (private repo created 2026-06-13). The `parasjaing8` gh account has no read access to it, which produced a misleading "Repository not found" on `git push`. Pushing requires `gh auth switch --hostname github.com --user chaitraparas` first (switched back to `parasjaing8` afterward). A secondary remote `parasjaing8/ahcplay` (public) also exists and was updated.
+- Moved the TMDB API key out of `app/build.gradle` (was hardcoded in source) into gitignored `local.properties` (`tmdb.api.key=...`), read via `localProperties.getProperty('tmdb.api.key', '')`. Verified with `generateDebugBuildConfig --rerun-tasks` that `BuildConfig.TMDB_API_KEY` still resolves correctly - `516d602`.
 
