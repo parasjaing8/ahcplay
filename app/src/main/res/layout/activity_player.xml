@@ -103,6 +103,7 @@
                     android:background="@drawable/selector_btn_player"
                     android:tint="#FFFFFF"
                     android:focusable="true"
+                    android:contentDescription="@string/player_audio_track"
                     android:nextFocusRight="@id/btn_rewind"
                     android:layout_marginEnd="16dp" />
 
@@ -114,6 +115,7 @@
                     android:background="@drawable/selector_btn_player"
                     android:tint="#FFFFFF"
                     android:focusable="true"
+                    android:contentDescription="@string/player_rewind"
                     android:nextFocusLeft="@id/btn_audio_track"
                     android:nextFocusRight="@id/btn_play_pause"
                     android:layout_marginEnd="24dp" />
@@ -126,6 +128,7 @@
                     android:background="@drawable/selector_btn_player"
                     android:tint="#7C4DFF"
                     android:focusable="true"
+                    android:contentDescription="@string/player_pause"
                     android:nextFocusLeft="@id/btn_rewind"
                     android:nextFocusRight="@id/btn_fast_forward"
                     android:layout_marginHorizontal="8dp" />
@@ -138,6 +141,7 @@
                     android:background="@drawable/selector_btn_player"
                     android:tint="#FFFFFF"
                     android:focusable="true"
+                    android:contentDescription="@string/player_fast_forward"
                     android:nextFocusLeft="@id/btn_play_pause"
                     android:nextFocusRight="@id/btn_sub_track"
                     android:layout_marginStart="24dp" />
@@ -150,6 +154,7 @@
                     android:background="@drawable/selector_btn_player"
                     android:tint="#FFFFFF"
                     android:focusable="true"
+                    android:contentDescription="@string/player_sub_track"
                     android:nextFocusLeft="@id/btn_fast_forward"
                     android:nextFocusRight="@id/tv_speed"
                     android:layout_marginStart="16dp" />

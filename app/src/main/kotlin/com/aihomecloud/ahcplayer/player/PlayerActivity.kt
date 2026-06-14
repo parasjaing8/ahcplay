@@ -111,6 +111,7 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
             when (event.type) {
                 MediaPlayer.Event.Playing -> runOnUiThread {
                     btnPlayPause.setImageResource(android.R.drawable.ic_media_pause)
+                    btnPlayPause.contentDescription = getString(R.string.player_pause)
                     if (resumePositionMs > 0 && surfaceReady) {
                         mediaPlayer.time = resumePositionMs
                         resumePositionMs = 0L
@@ -118,6 +119,7 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 }
                 MediaPlayer.Event.Paused, MediaPlayer.Event.Stopped -> runOnUiThread {
                     btnPlayPause.setImageResource(android.R.drawable.ic_media_play)
+                    btnPlayPause.contentDescription = getString(R.string.player_play)
                 }
                 MediaPlayer.Event.TimeChanged -> runOnUiThread {
                     if (!isSeeking) updateProgress(mediaPlayer.time, mediaPlayer.length)

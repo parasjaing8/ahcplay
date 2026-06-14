@@ -43,6 +43,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -150,6 +152,14 @@ private fun PosterCard(
         label = "posterBorder"
     )
 
+    val displayTitle = metadata?.displayTitle ?: item.name.substringBeforeLast('.')
+    val posterDescription = buildString {
+        append(displayTitle)
+        listOfNotNull(metadata?.year?.toString(), metadata?.mediaType, qualityLabel(item.name))
+            .forEach { append(", "); append(it) }
+        history?.let { append(", ${(it.progressFraction * 100).roundToInt()}% watched") }
+    }
+
     Column(
         modifier = modifier
             .width(158.dp)
@@ -159,6 +169,7 @@ private fun PosterCard(
             .clip(RoundedCornerShape(10.dp))
             .background(if (focused) BgCardFocused else BgCard)
             .border(if (focused) 3.dp else 1.dp, borderColor, RoundedCornerShape(10.dp))
+            .semantics { contentDescription = posterDescription }
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
@@ -178,7 +189,7 @@ private fun PosterCard(
         ) {
             PosterImage(
                 url = metadata?.posterUrl,
-                title = metadata?.displayTitle ?: item.name.substringBeforeLast('.')
+                title = displayTitle
             )
 
             qualityLabel(item.name)?.let { quality ->
@@ -227,7 +238,7 @@ private fun PosterCard(
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
-                text = metadata?.displayTitle ?: item.name.substringBeforeLast('.'),
+                text = displayTitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (focused) TextPrimary else TextSecondary,
                 maxLines = 1,
@@ -303,6 +314,7 @@ internal fun FolderCard(folder: BrowseItem, onClick: () -> Unit) {
                 if (focused) Accent else Color.White.copy(alpha = 0.08f),
                 RoundedCornerShape(10.dp)
             )
+            .semantics { contentDescription = "${folder.name}, collection" }
             .onFocusChanged { focused = it.isFocused }
             .clickable(onClick = onClick)
             .padding(18.dp)
@@ -384,6 +396,10 @@ private fun ContinueCard(
                 if (focused) Accent else Color.Transparent,
                 RoundedCornerShape(10.dp)
             )
+            .semantics {
+                contentDescription =
+                    "${item.title}, ${(item.progressFraction * 100).roundToInt()}% watched, resume"
+            }
             .onFocusChanged { focused = it.isFocused }
             .clickable(onClick = onClick)
     ) {

@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AHC Player</string>
+    <string name="player_play">Play</string>
+    <string name="player_pause">Pause</string>
+    <string name="player_rewind">Rewind 10 seconds</string>
+    <string name="player_fast_forward">Fast forward 10 seconds</string>
+    <string name="player_audio_track">Audio track</string>
+    <string name="player_sub_track">Subtitles</string>
 </resources>
