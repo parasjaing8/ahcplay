@@ -7,12 +7,36 @@ import com.aihomecloud.ahcplayer.data.db.AppDatabase
 import com.aihomecloud.ahcplayer.data.model.MediaSource
 import com.aihomecloud.ahcplayer.data.model.SourceType
 import com.aihomecloud.ahcplayer.data.model.WatchHistory
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+data class LibraryStats(
+    val backdrops: List<String> = emptyList(),
+    val movies: Int = 0,
+    val shows: Int = 0
+)
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val db = AppDatabase.get(app)
+
+    private val _libraryStats = MutableStateFlow(LibraryStats())
+    val libraryStats: StateFlow<LibraryStats> = _libraryStats.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            val dao = db.mediaMetadataDao()
+            _libraryStats.value = LibraryStats(
+                backdrops = dao.getRandomBackdrops(6),
+                movies = dao.countMovies(),
+                shows = dao.countShows()
+            )
+        }
+    }
 
     val sources = db.sourceDao().getAll()
         .map { list ->

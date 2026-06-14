@@ -1,11 +1,17 @@
 package com.aihomecloud.ahcplayer.ui.home
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,20 +20,37 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.SubcomposeAsyncImage
 import com.aihomecloud.ahcplayer.data.model.MediaSource
 import com.aihomecloud.ahcplayer.data.model.SourceType
 import com.aihomecloud.ahcplayer.data.model.WatchHistory
 import com.aihomecloud.ahcplayer.ui.theme.*
+
+private val ProfileAvatarSize = 112.dp
+private val ProfileRingStroke = 4.dp
+private const val ProfileAutoSelectMs = 3000
 
 @Composable
 fun HomeScreen(
@@ -39,14 +62,17 @@ fun HomeScreen(
 ) {
     val sources by vm.sources.collectAsStateWithLifecycle()
     val continueWatching by vm.continueWatching.collectAsStateWithLifecycle()
+    val libraryStats by vm.libraryStats.collectAsStateWithLifecycle()
     val ahcSources = sources.filter { it.sourceType == SourceType.AHC }
+    val lastUsedSourceId = continueWatching.firstOrNull()?.sourceId
 
     if (ahcSources.isNotEmpty()) {
         WhoIsWatchingLayout(
             ahcSources = ahcSources,
             allSources = sources,
+            libraryStats = libraryStats,
+            lastUsedSourceId = lastUsedSourceId,
             onBrowseSource = onBrowseSource,
-            onAddSource = onAddSource,
             onSettings = onSettings
         )
     } else {
@@ -67,18 +93,22 @@ fun HomeScreen(
 private fun WhoIsWatchingLayout(
     ahcSources: List<MediaSource>,
     allSources: List<MediaSource>,
+    libraryStats: LibraryStats,
+    lastUsedSourceId: Long?,
     onBrowseSource: (MediaSource) -> Unit,
-    onAddSource: () -> Unit,
     onSettings: () -> Unit
 ) {
     val smbSources = allSources.filter { it.sourceType == SourceType.SMB }
+    val defaultIndex = ahcSources.indexOfFirst { it.id == lastUsedSourceId }.let { if (it >= 0) it else 0 }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF090910))) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        ProfileBackdrop(backdrops = libraryStats.backdrops)
+
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(56.dp))
+            Spacer(Modifier.height(24.dp))
 
             // Settings row at top-right
             Row(
@@ -95,31 +125,45 @@ private fun WhoIsWatchingLayout(
                         .clickable { onSettings() }
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Text("Settings", color = if (settingsFocused) TextPrimary else TextMuted,
+                    Text("⚙ Settings", color = if (settingsFocused) TextPrimary else TextMuted,
                         style = MaterialTheme.typography.bodyMedium)
                 }
             }
 
-            Spacer(Modifier.height(48.dp))
+            Spacer(Modifier.height(16.dp))
+
+            Text("AiHomeCloud", style = MaterialTheme.typography.displayMedium, color = Accent)
+            Spacer(Modifier.height(6.dp))
+            Text("Your Personal Streaming Platform",
+                style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+
+            Spacer(Modifier.height(20.dp))
 
             Text(
-                "Who's watching?",
-                style = MaterialTheme.typography.headlineLarge,
+                "Who's Watching?",
+                style = MaterialTheme.typography.displayLarge,
                 color = TextPrimary
             )
-            Spacer(Modifier.height(8.dp))
-            Text("AHC Player", style = MaterialTheme.typography.bodyMedium, color = TextMuted)
-            Spacer(Modifier.height(52.dp))
+            Spacer(Modifier.height(28.dp))
 
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 80.dp),
-                horizontalArrangement = Arrangement.spacedBy(36.dp)
-            ) {
-                items(ahcSources) { src ->
-                    ProfileCircle(source = src, onClick = { onBrowseSource(src) })
-                }
-                item { AddProfileCircle(onClick = onAddSource) }
+            ProfileRow(
+                ahcSources = ahcSources,
+                defaultIndex = defaultIndex,
+                onSelect = onBrowseSource
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            val statsParts = buildList {
+                if (libraryStats.movies > 0) add("${libraryStats.movies} Movies")
+                if (libraryStats.shows > 0) add("${libraryStats.shows} Shows")
+                add("${ahcSources.size} Profile${if (ahcSources.size == 1) "" else "s"}")
             }
+            Text(
+                statsParts.joinToString("   •   "),
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextMuted
+            )
 
             if (smbSources.isNotEmpty()) {
                 Spacer(Modifier.height(48.dp))
@@ -135,8 +179,47 @@ private fun WhoIsWatchingLayout(
                 }
             }
 
-            Spacer(Modifier.height(80.dp))
+            Spacer(Modifier.height(32.dp))
         }
+    }
+}
+
+@Composable
+private fun ProfileBackdrop(backdrops: List<String>) {
+    Box(modifier = Modifier.fillMaxSize().background(BgPrimary)) {
+        if (backdrops.isNotEmpty()) {
+            val cells = List(6) { i -> backdrops[i % backdrops.size] }
+            Column(modifier = Modifier.fillMaxSize().blur(24.dp)) {
+                repeat(2) { row ->
+                    Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        repeat(3) { col ->
+                            SubcomposeAsyncImage(
+                                model = cells[row * 3 + col],
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                loading = { Box(Modifier.fillMaxSize().background(BgCard)) },
+                                error = { Box(Modifier.fillMaxSize().background(BgCard)) }
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            Box(
+                modifier = Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(listOf(AccentDim.copy(alpha = 0.35f), BgPrimary, BgPrimary))
+                )
+            )
+        }
+        // Dark overlay so foreground content stays legible
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)))
+        // Vignette
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.radialGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f)))
+            )
+        )
     }
 }
 
@@ -146,88 +229,130 @@ private val avatarPalette = listOf(
     Color(0xFF9C27B0), Color(0xFF03A9F4)
 )
 
+/**
+ * JioHotstar-style profile row: the currently selected profile (initially the
+ * last-used one) shows an animated ring that sweeps a full circle over
+ * [ProfileAutoSelectMs]. If the ring completes without the user moving focus,
+ * that profile auto-opens. Moving focus to another profile restarts the ring
+ * on the newly focused profile.
+ */
 @Composable
-private fun ProfileCircle(source: MediaSource, onClick: () -> Unit) {
+private fun ProfileRow(
+    ahcSources: List<MediaSource>,
+    defaultIndex: Int,
+    onSelect: (MediaSource) -> Unit
+) {
+    var selectedIndex by remember { mutableStateOf(defaultIndex.coerceIn(0, ahcSources.lastIndex)) }
+    val progress = remember { Animatable(0f) }
+    val focusRequesters = remember(ahcSources.size) { List(ahcSources.size) { FocusRequester() } }
+
+    LaunchedEffect(Unit) {
+        focusRequesters.getOrNull(selectedIndex)?.requestFocus()
+    }
+
+    LaunchedEffect(selectedIndex) {
+        progress.snapTo(0f)
+        progress.animateTo(1f, tween(ProfileAutoSelectMs, easing = LinearEasing))
+        ahcSources.getOrNull(selectedIndex)?.let(onSelect)
+    }
+
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 80.dp),
+        horizontalArrangement = Arrangement.spacedBy(40.dp)
+    ) {
+        itemsIndexed(ahcSources) { index, src ->
+            ProfileCard(
+                source = src,
+                showRing = index == selectedIndex,
+                progress = if (index == selectedIndex) progress.value else 0f,
+                modifier = Modifier
+                    .focusRequester(focusRequesters[index])
+                    .onFocusChanged { if (it.isFocused) selectedIndex = index },
+                onClick = { onSelect(src) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileCard(
+    source: MediaSource,
+    showRing: Boolean,
+    progress: Float,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     var focused by remember { mutableStateOf(false) }
     val name = source.username.ifEmpty { source.name }
     val color = avatarPalette[(name.hashCode() and 0x7FFFFFFF) % avatarPalette.size]
 
+    val scale by animateFloatAsState(if (focused) Dimens.focusScale else 1f, tween(200), label = "profileScale")
+    val elevation by animateDpAsState(if (focused) 16.dp else 0.dp, tween(200), label = "profileElevation")
+
     Column(
-        modifier = Modifier
-            .width(120.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (focused) BgCardFocused else Color.Transparent)
-            .then(if (focused) Modifier.border(Dimens.focusBorder, Accent, RoundedCornerShape(12.dp)) else Modifier)
+        modifier = modifier
             .onFocusChanged { focused = it.isFocused }
-            .clickable { onClick() }
-            .padding(12.dp),
+            .clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(contentAlignment = Alignment.BottomEnd) {
-            Box(
-                modifier = Modifier
-                    .size(88.dp)
-                    .clip(CircleShape)
-                    .background(color),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(name.take(1).uppercase(), fontSize = 36.sp, color = Color.White)
-            }
+        Box(
+            modifier = Modifier
+                .size(ProfileAvatarSize)
+                .graphicsLayer { scaleX = scale; scaleY = scale }
+                .shadow(elevation, CircleShape, ambientColor = Accent, spotColor = Accent)
+                .drawWithContent {
+                    drawContent()
+                    if (showRing) {
+                        val stroke = ProfileRingStroke.toPx()
+                        val arcTopLeft = Offset(stroke / 2f, stroke / 2f)
+                        val arcSize = Size(size.width - stroke, size.height - stroke)
+                        drawArc(
+                            color = AccentDim.copy(alpha = 0.35f),
+                            startAngle = -90f,
+                            sweepAngle = 360f,
+                            useCenter = false,
+                            topLeft = arcTopLeft,
+                            size = arcSize,
+                            style = Stroke(width = stroke, cap = StrokeCap.Round)
+                        )
+                        drawArc(
+                            color = Accent,
+                            startAngle = -90f,
+                            sweepAngle = 360f * progress,
+                            useCenter = false,
+                            topLeft = arcTopLeft,
+                            size = arcSize,
+                            style = Stroke(width = stroke, cap = StrokeCap.Round)
+                        )
+                    }
+                }
+                .padding(ProfileRingStroke + 2.dp)
+                .clip(CircleShape)
+                .background(color),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(name.take(1).uppercase(), fontSize = 40.sp, color = Color.White, fontWeight = FontWeight.Bold)
             if (source.hasPin) {
                 Box(
                     modifier = Modifier
-                        .size(24.dp)
+                        .align(Alignment.BottomEnd)
+                        .size(22.dp)
                         .clip(CircleShape)
-                        .background(BgPrimary),
+                        .background(BgPrimary.copy(alpha = 0.8f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("🔒", fontSize = 12.sp)
+                    Text("🔒", fontSize = 11.sp)
                 }
             }
         }
         Text(
             name,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.titleLarge,
             color = if (focused) TextPrimary else TextSecondary,
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun AddProfileCircle(onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier
-            .width(120.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (focused) BgCardFocused else Color.Transparent)
-            .then(if (focused) Modifier.border(Dimens.focusBorder, Accent, RoundedCornerShape(12.dp)) else Modifier)
-            .onFocusChanged { focused = it.isFocused }
-            .clickable { onClick() }
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(88.dp)
-                .border(1.dp, TextMuted.copy(alpha = 0.4f), CircleShape)
-                .clip(CircleShape)
-                .background(BgCard),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("+", fontSize = 40.sp, color = if (focused) TextPrimary else TextMuted)
-        }
-        Text(
-            "Add Profile",
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (focused) TextSecondary else TextMuted,
-            textAlign = TextAlign.Center
         )
     }
 }

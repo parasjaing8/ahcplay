@@ -28,6 +28,15 @@ interface MediaMetadataDao {
 
     @Query("DELETE FROM media_metadata")
     suspend fun deleteAll()
+
+    @Query("SELECT backdropUrl FROM media_metadata WHERE backdropUrl IS NOT NULL ORDER BY RANDOM() LIMIT :limit")
+    suspend fun getRandomBackdrops(limit: Int = 6): List<String>
+
+    @Query("SELECT COUNT(*) FROM media_metadata WHERE mediaType = 'Movie'")
+    suspend fun countMovies(): Int
+
+    @Query("SELECT COUNT(*) FROM media_metadata WHERE mediaType = 'Series'")
+    suspend fun countShows(): Int
 }
 
 @Dao
