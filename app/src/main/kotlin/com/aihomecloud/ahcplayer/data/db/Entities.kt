@@ -13,6 +13,7 @@ data class SourceEntity(
     val sourceType: String = "SMB",
     val username: String = "",
     val hasPin: Boolean = false,
+    val enabled: Boolean = true,
     val createdAt: Long = System.currentTimeMillis()
 )
 

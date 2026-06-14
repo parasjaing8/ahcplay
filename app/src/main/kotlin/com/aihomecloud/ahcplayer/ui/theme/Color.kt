@@ -16,3 +16,5 @@ val TextMuted = Color(0xFF6B6B80)
 
 val Overlay = Color(0xCC000000)
 val OverlayLight = Color(0x80000000)
+
+val Success = Color(0xFF4CAF50)

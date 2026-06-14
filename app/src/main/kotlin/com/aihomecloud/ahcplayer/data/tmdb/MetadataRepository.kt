@@ -1,7 +1,6 @@
 package com.aihomecloud.ahcplayer.data.tmdb
 
 import android.content.Context
-import com.aihomecloud.ahcplayer.BuildConfig
 import com.aihomecloud.ahcplayer.data.db.AppDatabase
 import com.aihomecloud.ahcplayer.data.db.MediaMetadataEntity
 import com.aihomecloud.ahcplayer.data.prefs.AppPreferences
@@ -20,12 +19,14 @@ class MetadataRepository(context: Context) {
     private val dao = AppDatabase.get(context).mediaMetadataDao()
     private val prefs = AppPreferences(context)
 
-    suspend fun get(filename: String): MediaMetadata? {
-        val cached = dao.get(filename)
-        if (cached != null) return cached.toMetadata()
+    suspend fun get(filename: String, forceRefresh: Boolean = false): MediaMetadata? {
+        if (!forceRefresh) {
+            val cached = dao.get(filename)
+            if (cached != null) return cached.toMetadata()
+        }
 
-        val apiKey = prefs.getTmdbApiKey() ?: BuildConfig.TMDB_API_KEY
-        if (apiKey.isBlank()) return fallback(filename, TitleParser.parse(filename))
+        val apiKey = prefs.getTmdbApiKey()
+        if (apiKey.isNullOrBlank()) return fallback(filename, TitleParser.parse(filename))
 
         val parsed = TitleParser.parse(filename)
         return try {

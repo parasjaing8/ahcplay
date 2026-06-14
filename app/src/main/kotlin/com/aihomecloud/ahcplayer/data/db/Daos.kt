@@ -16,6 +16,9 @@ interface SourceDao {
 
     @Delete
     suspend fun delete(source: SourceEntity)
+
+    @Query("UPDATE sources SET enabled = :enabled WHERE id = :id")
+    suspend fun setEnabled(id: Long, enabled: Boolean)
 }
 
 @Dao
@@ -30,13 +33,13 @@ interface MediaMetadataDao {
     suspend fun deleteAll()
 
     @Query("SELECT backdropUrl FROM media_metadata WHERE backdropUrl IS NOT NULL ORDER BY RANDOM() LIMIT :limit")
-    suspend fun getRandomBackdrops(limit: Int = 6): List<String>
+    fun getRandomBackdropsFlow(limit: Int = 6): Flow<List<String>>
 
     @Query("SELECT COUNT(*) FROM media_metadata WHERE mediaType = 'Movie'")
-    suspend fun countMovies(): Int
+    fun countMoviesFlow(): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM media_metadata WHERE mediaType = 'Series'")
-    suspend fun countShows(): Int
+    fun countShowsFlow(): Flow<Int>
 }
 
 @Dao

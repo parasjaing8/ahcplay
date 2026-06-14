@@ -5,12 +5,6 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
-import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
 
 data class AhcPairQrResponse(
     val serial: String,
@@ -87,34 +81,10 @@ interface AhcApiService {
     suspend fun loginWithProfile(@Body body: AhcLoginRequest): AhcLoginResponse
 }
 
-fun buildUnsafeTrustingClient(
-    connectTimeoutMs: Long = 10_000,
-    readTimeoutMs: Long = 30_000
-): OkHttpClient {
-    val trustAll = object : X509TrustManager {
-        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
-        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
-    }
-    val sslContext = SSLContext.getInstance("TLS").apply {
-        init(null, arrayOf<TrustManager>(trustAll), SecureRandom())
-    }
-    return OkHttpClient.Builder()
-        .sslSocketFactory(sslContext.socketFactory, trustAll)
-        .hostnameVerifier { _, _ -> true }
-        .connectTimeout(connectTimeoutMs, TimeUnit.MILLISECONDS)
-        .readTimeout(readTimeoutMs, TimeUnit.MILLISECONDS)
-        .build()
-}
-
-fun buildAhcRetrofit(
-    baseUrl: String,
-    connectTimeoutMs: Long = 10_000,
-    readTimeoutMs: Long = 30_000
-): AhcApiService =
+fun buildAhcRetrofit(baseUrl: String, client: OkHttpClient): AhcApiService =
     Retrofit.Builder()
         .baseUrl(baseUrl)
-        .client(buildUnsafeTrustingClient(connectTimeoutMs, readTimeoutMs))
+        .client(client)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
         .create(AhcApiService::class.java)

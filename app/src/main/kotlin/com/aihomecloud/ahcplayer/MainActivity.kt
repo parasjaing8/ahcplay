@@ -1,11 +1,17 @@
 package com.aihomecloud.ahcplayer
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -65,6 +72,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** Runtime permission needed to read video files from internal/USB storage. */
+private val storagePermission: String =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.READ_MEDIA_VIDEO
+    else Manifest.permission.READ_EXTERNAL_STORAGE
+
+private fun hasStoragePermission(context: android.content.Context): Boolean =
+    ContextCompat.checkSelfPermission(context, storagePermission) == PackageManager.PERMISSION_GRANTED
+
 sealed class Screen {
     object Home : Screen()
     object Discover : Screen()
@@ -83,6 +98,8 @@ fun AppNavHost(onPlayVideo: (uri: String, title: String, sourceId: Long) -> Unit
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     var backStack by remember { mutableStateOf(listOf<Screen>()) }
     var showExitDialog by remember { mutableStateOf(false) }
+    var pendingStorageSource by remember { mutableStateOf<MediaSource?>(null) }
+    var showStoragePermissionDenied by remember { mutableStateOf(false) }
 
     fun navigate(to: Screen) {
         backStack = backStack + screen
@@ -99,11 +116,32 @@ fun AppNavHost(onPlayVideo: (uri: String, title: String, sourceId: Long) -> Unit
     }
 
     // Routes AHC profile selection: if PIN required and no token → PinAuth; else → Browse
-    fun openSource(src: MediaSource) {
+    fun navigateToSource(src: MediaSource) {
         if (src.sourceType == SourceType.AHC && src.hasPin && ahcRepo.getToken(src.host, src.username) == null) {
             navigate(Screen.PinAuth(src))
         } else {
             navigate(Screen.Browse(src))
+        }
+    }
+
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val src = pendingStorageSource
+        pendingStorageSource = null
+        if (src == null) return@rememberLauncherForActivityResult
+        if (granted) navigateToSource(src) else showStoragePermissionDenied = true
+    }
+
+    // Internal/USB sources read files directly off device storage and need the
+    // runtime storage permission; request it lazily on first use.
+    fun openSource(src: MediaSource) {
+        val needsStoragePermission = src.sourceType == SourceType.INTERNAL || src.sourceType == SourceType.USB
+        if (needsStoragePermission && !hasStoragePermission(context)) {
+            pendingStorageSource = src
+            storagePermissionLauncher.launch(storagePermission)
+        } else {
+            navigateToSource(src)
         }
     }
 
@@ -160,12 +198,17 @@ fun AppNavHost(onPlayVideo: (uri: String, title: String, sourceId: Long) -> Unit
         if (showExitDialog) {
             ExitDialog(onConfirm = { onFinish() }, onDismiss = { showExitDialog = false })
         }
+
+        if (showStoragePermissionDenied) {
+            StoragePermissionDeniedDialog(onDismiss = { showStoragePermissionDenied = false })
+        }
     }
 }
 
 @Composable
 private fun ExitDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val yesFocusRequester = remember { FocusRequester() }
+    val noFocusRequester = remember { FocusRequester() }
 
     Box(
         modifier = Modifier.fillMaxSize().background(Color(0xCC000000)),
@@ -185,6 +228,7 @@ private fun ExitDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                 Box(
                     modifier = Modifier
                         .focusRequester(yesFocusRequester)
+                        .focusProperties { right = noFocusRequester }
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (yesFocused) Accent else AccentDim)
                         .then(if (yesFocused) Modifier.border(Dimens.focusBorder, Color.White, RoundedCornerShape(8.dp)) else Modifier)
@@ -198,6 +242,8 @@ private fun ExitDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                 var noFocused by remember { mutableStateOf(false) }
                 Box(
                     modifier = Modifier
+                        .focusRequester(noFocusRequester)
+                        .focusProperties { left = yesFocusRequester }
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (noFocused) BgCardFocused else BgPrimary)
                         .border(1.dp, if (noFocused) Accent else TextMuted, RoundedCornerShape(8.dp))
@@ -213,4 +259,45 @@ private fun ExitDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         }
     }
     LaunchedEffect(Unit) { yesFocusRequester.requestFocus() }
+}
+
+@Composable
+private fun StoragePermissionDeniedDialog(onDismiss: () -> Unit) {
+    val okFocusRequester = remember { FocusRequester() }
+
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color(0xCC000000)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(BgCard)
+                .padding(horizontal = 56.dp, vertical = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(28.dp)
+        ) {
+            Text("Storage permission needed", style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
+            Text(
+                "AHC Player needs storage access to browse this source. Grant the permission in " +
+                    "Android Settings > Apps > AHC Player > Permissions.",
+                style = MaterialTheme.typography.bodyLarge, color = TextSecondary
+            )
+            var okFocused by remember { mutableStateOf(false) }
+            Box(
+                modifier = Modifier
+                    .focusRequester(okFocusRequester)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (okFocused) Accent else AccentDim)
+                    .then(if (okFocused) Modifier.border(Dimens.focusBorder, Color.White, RoundedCornerShape(8.dp)) else Modifier)
+                    .onFocusChanged { okFocused = it.isFocused }
+                    .clickable { onDismiss() }
+                    .padding(horizontal = 40.dp, vertical = 14.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("OK", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            }
+        }
+    }
+    LaunchedEffect(Unit) { okFocusRequester.requestFocus() }
 }

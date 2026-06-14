@@ -35,6 +35,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -99,7 +101,15 @@ private fun WhoIsWatchingLayout(
     onSettings: () -> Unit
 ) {
     val smbSources = allSources.filter { it.sourceType == SourceType.SMB }
-    val defaultIndex = ahcSources.indexOfFirst { it.id == lastUsedSourceId }.let { if (it >= 0) it else 0 }
+    val internalStorageSource = MediaSource(
+        id = -1L,
+        name = "Internal Storage",
+        host = "/storage/emulated/0",
+        share = "",
+        sourceType = SourceType.INTERNAL
+    )
+    val profiles = ahcSources + internalStorageSource
+    val defaultIndex = profiles.indexOfFirst { it.id == lastUsedSourceId }.let { if (it >= 0) it else 0 }
 
     Box(modifier = Modifier.fillMaxSize()) {
         ProfileBackdrop(backdrops = libraryStats.backdrops)
@@ -147,7 +157,7 @@ private fun WhoIsWatchingLayout(
             Spacer(Modifier.height(28.dp))
 
             ProfileRow(
-                ahcSources = ahcSources,
+                profiles = profiles,
                 defaultIndex = defaultIndex,
                 onSelect = onBrowseSource
             )
@@ -238,13 +248,13 @@ private val avatarPalette = listOf(
  */
 @Composable
 private fun ProfileRow(
-    ahcSources: List<MediaSource>,
+    profiles: List<MediaSource>,
     defaultIndex: Int,
     onSelect: (MediaSource) -> Unit
 ) {
-    var selectedIndex by remember { mutableStateOf(defaultIndex.coerceIn(0, ahcSources.lastIndex)) }
+    var selectedIndex by remember { mutableStateOf(defaultIndex.coerceIn(0, profiles.lastIndex)) }
     val progress = remember { Animatable(0f) }
-    val focusRequesters = remember(ahcSources.size) { List(ahcSources.size) { FocusRequester() } }
+    val focusRequesters = remember(profiles.size) { List(profiles.size) { FocusRequester() } }
 
     LaunchedEffect(Unit) {
         focusRequesters.getOrNull(selectedIndex)?.requestFocus()
@@ -253,14 +263,14 @@ private fun ProfileRow(
     LaunchedEffect(selectedIndex) {
         progress.snapTo(0f)
         progress.animateTo(1f, tween(ProfileAutoSelectMs, easing = LinearEasing))
-        ahcSources.getOrNull(selectedIndex)?.let(onSelect)
+        profiles.getOrNull(selectedIndex)?.let(onSelect)
     }
 
     LazyRow(
         contentPadding = PaddingValues(horizontal = 80.dp),
         horizontalArrangement = Arrangement.spacedBy(40.dp)
     ) {
-        itemsIndexed(ahcSources) { index, src ->
+        itemsIndexed(profiles) { index, src ->
             ProfileCard(
                 source = src,
                 showRing = index == selectedIndex,
@@ -332,14 +342,19 @@ private fun ProfileCard(
                 .background(color),
             contentAlignment = Alignment.Center
         ) {
-            Text(name.take(1).uppercase(), fontSize = 40.sp, color = Color.White, fontWeight = FontWeight.Bold)
+            if (source.sourceType == SourceType.INTERNAL) {
+                Text("📁", fontSize = 36.sp, color = Color.White)
+            } else {
+                Text(name.take(1).uppercase(), fontSize = 40.sp, color = Color.White, fontWeight = FontWeight.Bold)
+            }
             if (source.hasPin) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .size(22.dp)
                         .clip(CircleShape)
-                        .background(BgPrimary.copy(alpha = 0.8f)),
+                        .background(BgPrimary.copy(alpha = 0.8f))
+                        .semantics { contentDescription = "PIN protected" },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("🔒", fontSize = 11.sp)

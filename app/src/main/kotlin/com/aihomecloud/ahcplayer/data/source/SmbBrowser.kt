@@ -18,6 +18,13 @@ object SmbBrowser {
             suspendCancellableCoroutine { cont ->
                 val libVlc = LibVLC(context, arrayListOf("--no-osd"))
                 val items = mutableListOf<BrowseItem>()
+                var libVlcReleased = false
+                fun releaseLibVlc() {
+                    if (!libVlcReleased) {
+                        libVlcReleased = true
+                        libVlc.release()
+                    }
+                }
 
                 val browser = object : MediaBrowser.EventListener {
                     override fun onMediaAdded(index: Int, media: IMedia) {
@@ -39,16 +46,21 @@ object SmbBrowser {
                             items.sortWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
                             cont.resume(items)
                         }
-                        libVlc.release()
+                        releaseLibVlc()
                     }
                 }
 
-                val mediaBrowser = MediaBrowser(libVlc, browser)
-                mediaBrowser.browse(Uri.parse(uri), 0)
+                try {
+                    val mediaBrowser = MediaBrowser(libVlc, browser)
+                    mediaBrowser.browse(Uri.parse(uri), 0)
 
-                cont.invokeOnCancellation {
-                    mediaBrowser.release()
-                    libVlc.release()
+                    cont.invokeOnCancellation {
+                        mediaBrowser.release()
+                        releaseLibVlc()
+                    }
+                } catch (e: Exception) {
+                    releaseLibVlc()
+                    if (cont.isActive) cont.resumeWithException(e)
                 }
             }
         }

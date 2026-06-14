@@ -7,14 +7,17 @@ import com.aihomecloud.ahcplayer.data.ahc.AhcRepository
 import com.aihomecloud.ahcplayer.data.db.AppDatabase
 import com.aihomecloud.ahcplayer.data.model.BrowseItem
 import com.aihomecloud.ahcplayer.data.model.WatchHistory
-import com.aihomecloud.ahcplayer.data.source.SmbBrowser
+import com.aihomecloud.ahcplayer.data.source.BrowseFetcher
 import com.aihomecloud.ahcplayer.data.tmdb.MediaMetadata
 import com.aihomecloud.ahcplayer.data.tmdb.MetadataRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 sealed class BrowseState {
     object Idle : BrowseState()
@@ -46,6 +49,7 @@ class BrowseViewModel(app: Application) : AndroidViewModel(app) {
     private val backStack = ArrayDeque<String>()
     private var allItems: List<BrowseItem> = emptyList()
     private var watchJob: Job? = null
+    private val metadataSemaphore = Semaphore(5)
 
     fun initBrowse(rootUri: String, sourceId: Long) {
         backStack.clear()
@@ -93,27 +97,12 @@ class BrowseViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun fetchItems(uri: String): List<BrowseItem> {
-        return if (uri.startsWith("ahc://")) {
-            val parsed = java.net.URI(uri)
-            val host = parsed.host
-            val port = parsed.port
-            val nasPath = parsed.path.ifEmpty { "/srv/nas" }
-            val query = uri.substringAfter("?", "")
-            val share = query.split("&").firstOrNull { it.startsWith("share=") }
-                ?.removePrefix("share=").orEmpty().ifEmpty { "media" }
-            val user = query.split("&").firstOrNull { it.startsWith("user=") }
-                ?.removePrefix("user=").orEmpty()
-            ahcRepo.listFiles(host, port, nasPath, share, user)
-                .filter { it.name.isNotEmpty() && !it.name.startsWith(".") && '/' !in it.name }
-        } else {
-            SmbBrowser.browse(getApplication(), uri)
-        }
-    }
+    private suspend fun fetchItems(uri: String): List<BrowseItem> =
+        BrowseFetcher.fetchItems(getApplication(), ahcRepo, uri)
 
     private suspend fun fetchMetadata(filename: String) {
-        val meta = metaRepo.get(filename) ?: return
-        _metadata.value = _metadata.value + (filename to meta)
+        val meta = metadataSemaphore.withPermit { metaRepo.get(filename) } ?: return
+        _metadata.update { it + (filename to meta) }
     }
 
     fun push(uri: String) {

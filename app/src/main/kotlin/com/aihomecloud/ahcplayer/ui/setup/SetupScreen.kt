@@ -191,8 +191,13 @@ fun AhcButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        colors = ButtonDefaults.buttonColors(containerColor = if (focused) AccentDim else Accent),
-        modifier = modifier.onFocusChanged { focused = it.isFocused }
+        colors = ButtonDefaults.buttonColors(containerColor = Accent),
+        modifier = modifier
+            .onFocusChanged { focused = it.isFocused }
+            .then(
+                if (focused) Modifier.border(Dimens.focusBorder, TextPrimary, RoundedCornerShape(percent = 50))
+                else Modifier
+            )
     ) {
         Text(text, color = Color.White, style = MaterialTheme.typography.titleLarge)
     }

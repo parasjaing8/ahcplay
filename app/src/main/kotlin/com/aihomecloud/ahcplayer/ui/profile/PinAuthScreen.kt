@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -174,7 +176,8 @@ private fun PinKey(label: String, onClick: () -> Unit) {
             .background(if (focused) BgCardFocused else BgCard)
             .then(if (focused) Modifier.border(Dimens.focusBorder, Accent, RoundedCornerShape(8.dp)) else Modifier)
             .onFocusChanged { focused = it.isFocused }
-            .clickable { onClick() },
+            .clickable { onClick() }
+            .then(if (label == "⌫") Modifier.semantics { contentDescription = "Delete" } else Modifier),
         contentAlignment = Alignment.Center
     ) {
         Text(label, fontSize = 24.sp, color = if (focused) Accent else TextPrimary)

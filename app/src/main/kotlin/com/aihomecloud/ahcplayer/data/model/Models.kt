@@ -1,6 +1,6 @@
 package com.aihomecloud.ahcplayer.data.model
 
-enum class SourceType { SMB, AHC }
+enum class SourceType { SMB, AHC, INTERNAL, USB }
 
 data class MediaSource(
     val id: Long = 0,
@@ -11,6 +11,7 @@ data class MediaSource(
     val sourceType: SourceType = SourceType.SMB,
     val username: String = "",
     val hasPin: Boolean = false,
+    val enabled: Boolean = true,
     val createdAt: Long = System.currentTimeMillis()
 ) {
     val smbBaseUri: String get() = "smb://$host/$share"
@@ -20,6 +21,7 @@ data class MediaSource(
             append("ahc://$host:$port/srv/nas?share=$share")
             if (username.isNotEmpty()) append("&user=$username")
         }
+        SourceType.INTERNAL, SourceType.USB -> "file://$host"
     }
 }
 

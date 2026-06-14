@@ -2,7 +2,6 @@ package com.aihomecloud.ahcplayer.data.tmdb
 
 import com.google.gson.annotations.SerializedName
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
@@ -88,6 +87,8 @@ data class TmdbMovieResult(
 
 data class TmdbSearchResponse(val results: List<TmdbMovieResult>)
 
+data class TmdbAuthResponse(val success: Boolean)
+
 interface TmdbService {
     @GET("search/multi")
     suspend fun search(
@@ -96,20 +97,18 @@ interface TmdbService {
         @Query("year") year: Int? = null,
         @Query("page") page: Int = 1
     ): TmdbSearchResponse
+
+    @GET("authentication")
+    suspend fun verifyKey(@Query("api_key") apiKey: String): TmdbAuthResponse
 }
 
 object TmdbClient {
     private const val BASE_URL = "https://api.themoviedb.org/3/"
 
     val service: TmdbService by lazy {
-        val client = OkHttpClient.Builder()
-            .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.NONE
-            })
-            .build()
         Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .client(client)
+            .client(OkHttpClient())
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(TmdbService::class.java)

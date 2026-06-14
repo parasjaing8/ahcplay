@@ -3,30 +3,21 @@ package com.aihomecloud.ahcplayer.data.ahc
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
 import com.aihomecloud.ahcplayer.data.model.BrowseItem
+import com.aihomecloud.ahcplayer.data.prefs.SecurePrefs
 
 private const val TAG = "AhcRepository"
 private const val PREFS_NAME = "ahc_tokens"
 
 class AhcRepository(context: Context) {
 
-    private val prefs: SharedPreferences = try {
-        val masterKey = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-        EncryptedSharedPreferences.create(
-            PREFS_NAME, masterKey, context.applicationContext,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-    } catch (e: Exception) {
-        Log.w(TAG, "EncryptedSharedPreferences unavailable, falling back to plain", e)
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    }
+    private val prefs: SharedPreferences = SecurePrefs.create(context, PREFS_NAME)
 
     // username="" = device-level token (auto-pair); username="Paras" = profile token
     private fun tokenKey(host: String, username: String = "") =
         if (username.isEmpty()) "token_$host" else "token_${host}_$username"
+
+    private fun certPinKey(host: String) = "certpin_$host"
 
     fun getToken(host: String, username: String = "") =
         prefs.getString(tokenKey(host, username), null)
@@ -39,6 +30,17 @@ class AhcRepository(context: Context) {
         prefs.edit().remove(tokenKey(host, username)).apply()
     }
 
+    // Builds a Retrofit client pinned to this host's certificate (TOFU on first contact).
+    private fun apiFor(host: String, port: Int, connectTimeoutMs: Long = 10_000, readTimeoutMs: Long = 30_000): AhcApiService {
+        val client = buildAhcClient(
+            pinnedPin = prefs.getString(certPinKey(host), null),
+            onFirstSeen = { pin -> prefs.edit().putString(certPinKey(host), pin).apply() },
+            connectTimeoutMs = connectTimeoutMs,
+            readTimeoutMs = readTimeoutMs
+        )
+        return buildAhcRetrofit("https://$host:$port/", client)
+    }
+
     // Auto-pair at device level (no profile)
     suspend fun ensureToken(host: String, port: Int, username: String = ""): String {
         val existing = getToken(host, username)
@@ -47,7 +49,7 @@ class AhcRepository(context: Context) {
     }
 
     private suspend fun autopair(host: String, port: Int, username: String): String {
-        val api = buildAhcRetrofit("https://$host:$port/")
+        val api = apiFor(host, port)
         val qr = api.getPairingInfo()
         val tokenResp = api.pair(AhcPairRequest(qr.serial, qr.key))
         saveToken(host, username, tokenResp.token)
@@ -57,7 +59,7 @@ class AhcRepository(context: Context) {
     // Used by DiscoverViewModel to probe a single IP
     suspend fun probeHost(host: String, port: Int = 8443): AhcDeviceInfo? {
         return try {
-            val api = buildAhcRetrofit("https://$host:$port/", connectTimeoutMs = 1500L, readTimeoutMs = 2000L)
+            val api = apiFor(host, port, connectTimeoutMs = 1500L, readTimeoutMs = 2000L)
             val qr = api.getPairingInfo()
             AhcDeviceInfo(host = host, port = port, serial = qr.serial, displayName = serialToDisplayName(qr.serial))
         } catch (e: Exception) { null }
@@ -65,7 +67,7 @@ class AhcRepository(context: Context) {
 
     // Returns profiles from the device (GET /api/v1/users)
     suspend fun getProfiles(host: String, port: Int): List<AhcUserProfile> {
-        val api = buildAhcRetrofit("https://$host:$port/")
+        val api = apiFor(host, port)
         return try {
             api.getProfiles().users
         } catch (e: Exception) {
@@ -76,7 +78,7 @@ class AhcRepository(context: Context) {
 
     // Profile login: PIN-based = call /auth/login; no-PIN = use device token associated with profile name
     suspend fun loginWithProfile(host: String, port: Int, username: String, pin: String = ""): String {
-        val api = buildAhcRetrofit("https://$host:$port/")
+        val api = apiFor(host, port)
         val resp = api.loginWithProfile(AhcLoginRequest(username, pin))
         saveToken(host, username, resp.accessToken)
         return resp.accessToken
@@ -90,7 +92,7 @@ class AhcRepository(context: Context) {
         username: String = ""
     ): List<BrowseItem> {
         val token = getOrFetchToken(host, port, username)
-        val api = buildAhcRetrofit("https://$host:$port/")
+        val api = apiFor(host, port)
         return try {
             fetchPage(api, token, nasPath, smbShare, host, username)
         } catch (e: retrofit2.HttpException) {

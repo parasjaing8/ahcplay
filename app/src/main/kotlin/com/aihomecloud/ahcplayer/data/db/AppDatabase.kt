@@ -6,10 +6,11 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.aihomecloud.ahcplayer.BuildConfig
 
 @Database(
     entities = [SourceEntity::class, WatchHistoryEntity::class, MediaMetadataEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,14 +36,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE sources ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun get(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 "ahcplayer.db"
             )
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
-                .fallbackToDestructiveMigration()
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .apply { if (BuildConfig.DEBUG) fallbackToDestructiveMigration() }
                 .build().also { INSTANCE = it }
         }
     }
