@@ -90,7 +90,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun clearMetadataCache() {
+    fun rescanMetadata() {
         viewModelScope.launch {
             db.mediaMetadataDao().deleteAll()
         }
@@ -143,8 +143,7 @@ fun SettingsScreen(
                 when (selectedCategory) {
                     SettingsCategory.SOURCES -> SourcesPane(sources = sources, onDelete = vm::deleteSource)
                     SettingsCategory.DATA -> DataPane(
-                        onClearHistory = { showClearHistoryConfirm = true },
-                        onClearMetadata = vm::clearMetadataCache
+                        onClearHistory = { showClearHistoryConfirm = true }
                     )
                     SettingsCategory.TMDB -> TmdbPane(vm = vm)
                     SettingsCategory.ABOUT -> AboutPane()
@@ -217,18 +216,12 @@ private fun SourcesPane(sources: List<MediaSource>, onDelete: (MediaSource) -> U
 }
 
 @Composable
-private fun DataPane(onClearHistory: () -> Unit, onClearMetadata: () -> Unit) {
+private fun DataPane(onClearHistory: () -> Unit) {
     PaneHeader("Data")
     SettingsRow(
         title = "Clear Watch History",
         subtitle = "Remove all resume points",
         onClick = onClearHistory
-    )
-    Spacer(Modifier.height(8.dp))
-    SettingsRow(
-        title = "Clear Metadata Cache",
-        subtitle = "Re-fetch TMDB posters",
-        onClick = onClearMetadata
     )
 }
 
@@ -266,6 +259,13 @@ private fun TmdbPane(vm: SettingsViewModel) {
             onClick = { vm.clearTmdbApiKey() }
         )
     }
+
+    Spacer(Modifier.height(24.dp))
+    SettingsRow(
+        title = "Rescan",
+        subtitle = "Re-fetch posters, backdrops, and metadata",
+        onClick = vm::rescanMetadata
+    )
 }
 
 @Composable

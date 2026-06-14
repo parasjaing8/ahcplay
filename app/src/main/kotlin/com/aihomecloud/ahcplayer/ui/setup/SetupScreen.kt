@@ -20,6 +20,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -126,13 +132,28 @@ fun AhcTextField(
     imeAction: ImeAction = ImeAction.Next,
     keyboardActions: KeyboardActions = KeyboardActions.Default
 ) {
+    var editing by remember { mutableStateOf(false) }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label, color = TextMuted) },
         singleLine = true,
+        readOnly = !editing,
         keyboardOptions = KeyboardOptions(imeAction = imeAction),
-        keyboardActions = keyboardActions,
+        keyboardActions = KeyboardActions(
+            onDone = {
+                editing = false
+                keyboardController?.hide()
+                keyboardActions.onDone?.invoke(this)
+            },
+            onNext = keyboardActions.onNext,
+            onGo = keyboardActions.onGo,
+            onSearch = keyboardActions.onSearch,
+            onSend = keyboardActions.onSend,
+            onPrevious = keyboardActions.onPrevious
+        ),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Accent,
             unfocusedBorderColor = TextMuted,
@@ -142,7 +163,20 @@ fun AhcTextField(
             focusedContainerColor = BgCard,
             unfocusedContainerColor = BgCard
         ),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .onFocusChanged { if (!it.isFocused) editing = false }
+            .onKeyEvent { event ->
+                if (!editing && event.type == KeyEventType.KeyUp &&
+                    (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter)
+                ) {
+                    editing = true
+                    keyboardController?.show()
+                    true
+                } else {
+                    false
+                }
+            }
     )
 }
 
