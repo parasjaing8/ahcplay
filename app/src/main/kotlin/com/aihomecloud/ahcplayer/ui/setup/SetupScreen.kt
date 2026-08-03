@@ -3,6 +3,7 @@ package com.aihomecloud.ahcplayer.ui.setup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,6 +26,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -134,6 +136,7 @@ fun AhcTextField(
 ) {
     var editing by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusRequester = remember { FocusRequester() }
 
     OutlinedTextField(
         value = value,
@@ -165,6 +168,22 @@ fun AhcTextField(
         ),
         modifier = Modifier
             .fillMaxWidth()
+            .focusRequester(focusRequester)
+            // On a touchscreen a tap must start editing directly; the D-pad path below
+            // only highlights first, which would otherwise leave the field unusable by touch.
+            .then(
+                if (!editing) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures {
+                            editing = true
+                            focusRequester.requestFocus()
+                            keyboardController?.show()
+                        }
+                    }
+                } else {
+                    Modifier
+                }
+            )
             .onFocusChanged { if (!it.isFocused) editing = false }
             .onKeyEvent { event ->
                 if (!editing && event.type == KeyEventType.KeyUp &&
