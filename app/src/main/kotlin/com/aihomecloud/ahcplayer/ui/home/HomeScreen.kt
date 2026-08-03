@@ -17,7 +17,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import android.content.pm.PackageManager
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -267,7 +269,17 @@ private fun ProfileRow(
         focusRequesters.getOrNull(selectedIndex)?.requestFocus()
     }
 
-    LaunchedEffect(selectedIndex) {
+    // Dwell-to-select is a TV convention: with a remote there is no tap, so resting on a
+    // profile commits to it. On a touch device the same timer navigates with no input at
+    // all — it fires before the user has even reached for the screen, which is how it
+    // ended up opening a PIN-protected profile nobody chose. Touch selects explicitly.
+    val context = LocalContext.current
+    val isTv = remember {
+        context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    }
+
+    LaunchedEffect(selectedIndex, isTv) {
+        if (!isTv) return@LaunchedEffect
         progress.snapTo(0f)
         progress.animateTo(1f, tween(ProfileAutoSelectMs, easing = LinearEasing))
         profiles.getOrNull(selectedIndex)?.let(onSelect)

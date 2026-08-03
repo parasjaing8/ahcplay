@@ -113,13 +113,25 @@ class BrowseViewModel(app: Application) : AndroidViewModel(app) {
         _metadata.update { it + (item.name to withArt) }
     }
 
-    /** Server-generated thumbnail for an AiHomeCloud-hosted video, or null for other sources. */
+    /**
+     * Server-generated thumbnail for a video hosted by an AiHomeCloud server.
+     *
+     * Files are handed `smb://host/share/<relative>` URIs so libVLC can stream them
+     * directly — only directories carry `ahc://`. So the server identity comes from the
+     * directory currently being browsed, and the NAS path is recovered from the file's
+     * own SMB URI by dropping the share segment.
+     */
     private fun serverThumbnailFor(item: BrowseItem): String? {
-        if (item.isDirectory || !item.uri.startsWith("ahc://")) return null
-        val u = android.net.Uri.parse(item.uri)
-        val host = u.host ?: return null
-        val path = u.path?.takeIf { it.isNotBlank() } ?: return null
-        return ahcThumbnailUrl(host, u.port.takeIf { it > 0 } ?: AHC_DEFAULT_PORT, path)
+        if (item.isDirectory) return null
+        val root = android.net.Uri.parse(_currentUri.value)
+        if (root.scheme != "ahc") return null
+        val host = root.host ?: return null
+        val smb = android.net.Uri.parse(item.uri)
+        if (smb.scheme != "smb") return null
+        val segments = smb.pathSegments
+        if (segments.size < 2) return null
+        val nasPath = "/" + segments.drop(1).joinToString("/")
+        return ahcThumbnailUrl(host, root.port.takeIf { it > 0 } ?: AHC_DEFAULT_PORT, nasPath)
     }
 
     /**
