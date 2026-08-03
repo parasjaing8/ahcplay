@@ -50,7 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aihomecloud.ahcplayer.data.model.BrowseItem
 import com.aihomecloud.ahcplayer.data.model.WatchHistory
-import com.aihomecloud.ahcplayer.data.tmdb.MediaMetadata
+import com.aihomecloud.ahcplayer.data.metadata.MediaMetadata
 import com.aihomecloud.ahcplayer.ui.theme.Accent
 import com.aihomecloud.ahcplayer.ui.theme.BgPrimary
 import com.aihomecloud.ahcplayer.ui.theme.Dimens

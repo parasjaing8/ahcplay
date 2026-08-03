@@ -1,4 +1,4 @@
-package com.aihomecloud.ahcplayer.data.tmdb
+package com.aihomecloud.ahcplayer.data.metadata
 
 data class ParsedTitle(val title: String, val year: Int?, val isTvShow: Boolean)
 

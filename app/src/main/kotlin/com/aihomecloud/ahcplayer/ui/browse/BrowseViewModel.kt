@@ -8,8 +8,8 @@ import com.aihomecloud.ahcplayer.data.db.AppDatabase
 import com.aihomecloud.ahcplayer.data.model.BrowseItem
 import com.aihomecloud.ahcplayer.data.model.WatchHistory
 import com.aihomecloud.ahcplayer.data.source.BrowseFetcher
-import com.aihomecloud.ahcplayer.data.tmdb.MediaMetadata
-import com.aihomecloud.ahcplayer.data.tmdb.MetadataRepository
+import com.aihomecloud.ahcplayer.data.metadata.MediaMetadata
+import com.aihomecloud.ahcplayer.data.metadata.MetadataRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

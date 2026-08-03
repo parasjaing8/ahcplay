@@ -30,7 +30,6 @@ import com.aihomecloud.ahcplayer.data.prefs.AppPreferences
 import com.aihomecloud.ahcplayer.data.prefs.SecurePrefs
 import com.aihomecloud.ahcplayer.data.scan.LibraryScanner
 import com.aihomecloud.ahcplayer.data.source.StorageHelper
-import com.aihomecloud.ahcplayer.data.tmdb.TmdbClient
 import com.aihomecloud.ahcplayer.ui.setup.AhcButton
 import com.aihomecloud.ahcplayer.ui.setup.AhcTextField
 import com.aihomecloud.ahcplayer.ui.theme.*
@@ -45,11 +44,9 @@ import java.io.File
 private enum class SettingsCategory(val label: String) {
     SOURCES("Sources"),
     DATA("Data"),
-    TMDB("TMDB"),
     ABOUT("About")
 }
 
-enum class TmdbVerifyState { IDLE, CHECKING, VALID, INVALID }
 enum class RescanState { IDLE, RUNNING, DONE }
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
@@ -70,53 +67,6 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         .map { list -> list.map(::mapSource) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    var tmdbApiKey by mutableStateOf(prefs.getTmdbApiKey().orEmpty())
-        private set
-
-    var tmdbVerifyState by mutableStateOf(TmdbVerifyState.IDLE)
-        private set
-
-    var rescanState by mutableStateOf(RescanState.IDLE)
-        private set
-
-    var rescanCount by mutableStateOf(0)
-        private set
-
-    var usbVolumes by mutableStateOf<List<File>>(emptyList())
-        private set
-
-    fun updateTmdbApiKey(key: String) {
-        tmdbApiKey = key
-        tmdbVerifyState = TmdbVerifyState.IDLE
-    }
-
-    fun saveTmdbApiKey() {
-        prefs.setTmdbApiKey(tmdbApiKey)
-        verifyTmdbKey()
-    }
-
-    fun clearTmdbApiKey() {
-        prefs.setTmdbApiKey(null)
-        tmdbApiKey = ""
-        tmdbVerifyState = TmdbVerifyState.IDLE
-    }
-
-    private fun verifyTmdbKey() {
-        if (tmdbApiKey.isBlank()) {
-            tmdbVerifyState = TmdbVerifyState.INVALID
-            return
-        }
-        tmdbVerifyState = TmdbVerifyState.CHECKING
-        viewModelScope.launch {
-            tmdbVerifyState = try {
-                if (TmdbClient.service.verifyKey(tmdbApiKey).success) TmdbVerifyState.VALID
-                else TmdbVerifyState.INVALID
-            } catch (e: Exception) {
-                TmdbVerifyState.INVALID
-            }
-        }
-    }
-
     fun deleteSource(source: MediaSource) {
         viewModelScope.launch {
             db.sourceDao().delete(SourceEntity(id = source.id, name = source.name, host = source.host,
@@ -133,6 +83,15 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             db.sourceDao().setEnabled(id, enabled)
         }
     }
+
+    var rescanState by mutableStateOf(RescanState.IDLE)
+        private set
+
+    var rescanCount by mutableStateOf(0)
+        private set
+
+    var usbVolumes by mutableStateOf<List<File>>(emptyList())
+        private set
 
     fun loadUsbVolumes() {
         viewModelScope.launch {
@@ -219,7 +178,6 @@ fun SettingsScreen(
                         SettingsCategory.DATA -> DataPane(
                             onClearHistory = { showClearHistoryConfirm = true }
                         )
-                        SettingsCategory.TMDB -> TmdbPane(vm = vm)
                         SettingsCategory.ABOUT -> AboutPane()
                     }
                 }
@@ -364,81 +322,15 @@ private fun DataPane(onClearHistory: () -> Unit) {
 }
 
 @Composable
-private fun TmdbPane(vm: SettingsViewModel) {
-    PaneHeader("TMDB")
-    Text(
-        "Used to fetch posters, backdrops, and metadata for your library.",
-        color = TextSecondary, style = MaterialTheme.typography.bodyMedium
-    )
-    Spacer(Modifier.height(16.dp))
-
-    AhcTextField(
-        value = vm.tmdbApiKey,
-        onValueChange = vm::updateTmdbApiKey,
-        label = "TMDB API Key"
-    )
-    Spacer(Modifier.height(8.dp))
-
-    val statusText = if (vm.tmdbApiKey.isNotBlank()) "Using custom key"
-        else "No key configured — posters and metadata disabled. Get a free key at themoviedb.org."
-    Text(statusText, color = TextMuted, style = MaterialTheme.typography.bodyMedium)
-    Spacer(Modifier.height(16.dp))
-
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        AhcButton(
-            text = "Save",
-            onClick = vm::saveTmdbApiKey
-        )
-        AhcButton(
-            text = "Clear",
-            onClick = { vm.clearTmdbApiKey() }
-        )
-        TmdbVerifyBadge(vm.tmdbVerifyState)
-    }
-
-    Spacer(Modifier.height(24.dp))
-    SettingsRow(
-        title = "Rescan",
-        subtitle = "Re-fetch posters, backdrops, and metadata",
-        onClick = vm::rescanMetadata
-    )
-}
-
-@Composable
-private fun TmdbVerifyBadge(state: TmdbVerifyState) {
-    when (state) {
-        TmdbVerifyState.CHECKING -> CircularProgressIndicator(
-            modifier = Modifier.size(24.dp),
-            color = Accent,
-            strokeWidth = 2.dp
-        )
-        TmdbVerifyState.VALID -> Box(
-            modifier = Modifier.size(24.dp).clip(CircleShape).background(Success),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("✓", color = Color.White, style = MaterialTheme.typography.bodyMedium)
-        }
-        TmdbVerifyState.INVALID -> Box(
-            modifier = Modifier.size(24.dp).clip(CircleShape).background(MaterialTheme.colorScheme.error),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("✕", color = Color.White, style = MaterialTheme.typography.bodyMedium)
-        }
-        TmdbVerifyState.IDLE -> {}
-    }
-}
-
-@Composable
 private fun AboutPane() {
     PaneHeader("About")
     Text("AHC Player v1.0", color = TextSecondary, style = MaterialTheme.typography.bodyLarge)
     Text("Powered by libVLC 3.6.3", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
-    Text("TMDB for metadata", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
     if (!SecurePrefs.isEncrypted) {
         Spacer(Modifier.height(16.dp))
         Text(
-            "Warning: secure storage is unavailable on this device. Login tokens and your TMDB " +
-                "key are stored unencrypted.",
+            "Warning: secure storage is unavailable on this device. Login tokens are stored " +
+                "unencrypted.",
             color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium
         )
     }

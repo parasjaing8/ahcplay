@@ -4,7 +4,7 @@ import android.content.Context
 import com.aihomecloud.ahcplayer.data.ahc.AhcRepository
 import com.aihomecloud.ahcplayer.data.model.MediaSource
 import com.aihomecloud.ahcplayer.data.source.BrowseFetcher
-import com.aihomecloud.ahcplayer.data.tmdb.MetadataRepository
+import com.aihomecloud.ahcplayer.data.metadata.MetadataRepository
 
 private const val MAX_DEPTH = 6
 

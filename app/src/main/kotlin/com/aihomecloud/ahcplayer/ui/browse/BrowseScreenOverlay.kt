@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.aihomecloud.ahcplayer.data.model.BrowseItem
-import com.aihomecloud.ahcplayer.data.tmdb.MediaMetadata
+import com.aihomecloud.ahcplayer.data.metadata.MediaMetadata
 import com.aihomecloud.ahcplayer.ui.theme.Accent
 import com.aihomecloud.ahcplayer.ui.theme.BgCard
 import com.aihomecloud.ahcplayer.ui.theme.BgCardFocused

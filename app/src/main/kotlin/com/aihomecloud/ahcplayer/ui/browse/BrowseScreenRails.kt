@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import com.aihomecloud.ahcplayer.data.model.BrowseItem
 import com.aihomecloud.ahcplayer.data.model.WatchHistory
-import com.aihomecloud.ahcplayer.data.tmdb.MediaMetadata
+import com.aihomecloud.ahcplayer.data.metadata.MediaMetadata
 import com.aihomecloud.ahcplayer.ui.theme.Accent
 import com.aihomecloud.ahcplayer.ui.theme.BgCard
 import com.aihomecloud.ahcplayer.ui.theme.BgCardFocused
