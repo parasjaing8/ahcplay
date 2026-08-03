@@ -76,3 +76,11 @@
 - [ ] **Server thumbnails are wired but not consumed.** `AhcImageLoaders` +
   `ahcThumbnailUrl` + `AhcRepository.imageClientFor` exist; the browse layer does not
   yet request them, so posters remain letter tiles. This is the replacement for TMDB.
+- [ ] **Profile picker ignores the tapped profile.** Selecting any profile on the
+  "Who's Watching?" home layout lands on the PIN screen for `Paras` (the last-used /
+  focus-ringed one). Reproduced repeatedly on the tablet with taps at different
+  coordinates and via D-pad. Blocks reaching a browse screen at all, and blocked
+  verification of thumbnail rendering.
+- [ ] **Thumbnail rendering unverified in-app.** Server endpoint proven (200,
+  image/jpeg) and the Coil wiring compiles, but no screenshot of a rendered poster
+  yet — gated on the profile-picker bug above.
