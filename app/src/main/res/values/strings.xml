@@ -7,4 +7,58 @@
     <string name="player_fast_forward">Fast forward 10 seconds</string>
     <string name="player_audio_track">Audio track</string>
     <string name="player_sub_track">Subtitles</string>
+
+    <!-- Player overflow menu -->
+    <string name="player_more">More options</string>
+    <string name="menu_lock">Lock</string>
+    <string name="menu_sleep_timer">Sleep timer</string>
+    <string name="menu_playback_speed">Playback speed</string>
+    <string name="menu_jump_to_time">Jump to Time</string>
+    <string name="menu_equalizer">Equalizer</string>
+    <string name="menu_play_as_audio">Play as audio</string>
+    <string name="menu_popup_player">Pop-Up player</string>
+    <string name="menu_repeat_mode">Repeat mode</string>
+    <string name="menu_video_info">Video information</string>
+    <string name="menu_go_to_chapter">Go to chapter…</string>
+    <string name="menu_bookmarks">Bookmarks</string>
+    <string name="menu_ab_repeat">A-B repeat</string>
+    <string name="menu_save_playlist">Save Playlist</string>
+    <string name="menu_control_settings">Control settings</string>
+    <string name="menu_video_tips">Video player tips</string>
+
+    <!-- Track selector sheet -->
+    <string name="tracks_audio">Audio</string>
+    <string name="tracks_subtitles">Subtitles</string>
+    <string name="tracks_audio_delay">Audio delay</string>
+    <string name="tracks_subtitle_delay">Subtitle delay</string>
+    <string name="tracks_disable">Disable track</string>
+    <string name="tracks_none">No track</string>
+    <string name="player_video_size">Video size</string>
+
+    <!-- Feature dialogs -->
+    <string name="speed_title">Playback speed</string>
+    <string name="speed_reset">Reset</string>
+    <string name="jump_title">Jump to time</string>
+    <string name="jump_hint">hh:mm:ss</string>
+    <string name="jump_invalid">Invalid time</string>
+    <string name="sleep_title">Sleep timer</string>
+    <string name="sleep_off">Off</string>
+    <string name="sleep_set">Sleep timer set for %1$d min</string>
+    <string name="sleep_cancelled">Sleep timer cancelled</string>
+    <string name="eq_title">Equalizer</string>
+    <string name="eq_off">Off</string>
+    <string name="repeat_title">Repeat mode</string>
+    <string name="repeat_none">None</string>
+    <string name="repeat_one">Repeat one</string>
+    <string name="video_info_title">Video information</string>
+    <string name="chapters_title">Chapters</string>
+    <string name="chapters_none">No chapters</string>
+    <string name="ab_set_a">A set at %1$s</string>
+    <string name="ab_set_b">A-B repeat on</string>
+    <string name="ab_cleared">A-B repeat off</string>
+    <string name="locked_toast">Screen locked — press Back to unlock</string>
+    <string name="unlocked_toast">Unlocked</string>
+    <string name="delay_value">%1$d ms</string>
+    <string name="not_supported_on_device">Not supported on this device</string>
+    <string name="coming_soon">Coming soon</string>
 </resources>

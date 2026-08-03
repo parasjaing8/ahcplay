@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/player_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000">
@@ -9,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Brief seek position indicator (center of screen) -->
+    <!-- Brief seek / info indicator (center of screen) -->
     <TextView
         android:id="@+id/seek_indicator"
         android:layout_width="wrap_content"
@@ -30,7 +31,6 @@
         android:background="#80000000"
         android:visibility="gone">
 
-        <!-- Title row -->
         <TextView
             android:id="@+id/tv_title"
             android:layout_width="match_parent"
@@ -44,7 +44,6 @@
 
         <Space android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1" />
 
-        <!-- Bottom controls -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -96,14 +95,27 @@
                 android:layout_marginTop="12dp">
 
                 <ImageButton
-                    android:id="@+id/btn_audio_track"
+                    android:id="@+id/btn_sub_track"
                     android:layout_width="56dp"
                     android:layout_height="56dp"
-                    android:src="@android:drawable/ic_menu_info_details"
+                    android:src="@drawable/ic_subtitles"
                     android:background="@drawable/selector_btn_player"
-                    android:tint="#FFFFFF"
+                    android:scaleType="centerInside"
                     android:focusable="true"
-                    android:contentDescription="@string/player_audio_track"
+                    android:contentDescription="@string/player_sub_track"
+                    android:nextFocusRight="@id/btn_aspect"
+                    android:layout_marginEnd="16dp" />
+
+                <ImageButton
+                    android:id="@+id/btn_aspect"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:src="@drawable/ic_aspect_ratio"
+                    android:background="@drawable/selector_btn_player"
+                    android:scaleType="centerInside"
+                    android:focusable="true"
+                    android:contentDescription="@string/player_video_size"
+                    android:nextFocusLeft="@id/btn_sub_track"
                     android:nextFocusRight="@id/btn_rewind"
                     android:layout_marginEnd="16dp" />
 
@@ -113,10 +125,11 @@
                     android:layout_height="56dp"
                     android:src="@android:drawable/ic_media_rew"
                     android:background="@drawable/selector_btn_player"
+                    android:scaleType="centerInside"
                     android:tint="#FFFFFF"
                     android:focusable="true"
                     android:contentDescription="@string/player_rewind"
-                    android:nextFocusLeft="@id/btn_audio_track"
+                    android:nextFocusLeft="@id/btn_aspect"
                     android:nextFocusRight="@id/btn_play_pause"
                     android:layout_marginEnd="24dp" />
 
@@ -126,6 +139,7 @@
                     android:layout_height="72dp"
                     android:src="@android:drawable/ic_media_pause"
                     android:background="@drawable/selector_btn_player"
+                    android:scaleType="centerInside"
                     android:tint="#7C4DFF"
                     android:focusable="true"
                     android:contentDescription="@string/player_pause"
@@ -139,43 +153,79 @@
                     android:layout_height="56dp"
                     android:src="@android:drawable/ic_media_ff"
                     android:background="@drawable/selector_btn_player"
+                    android:scaleType="centerInside"
                     android:tint="#FFFFFF"
                     android:focusable="true"
                     android:contentDescription="@string/player_fast_forward"
                     android:nextFocusLeft="@id/btn_play_pause"
-                    android:nextFocusRight="@id/btn_sub_track"
+                    android:nextFocusRight="@id/btn_audio_track"
                     android:layout_marginStart="24dp" />
 
                 <ImageButton
-                    android:id="@+id/btn_sub_track"
+                    android:id="@+id/btn_audio_track"
                     android:layout_width="56dp"
                     android:layout_height="56dp"
-                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:src="@drawable/ic_play_as_audio"
                     android:background="@drawable/selector_btn_player"
-                    android:tint="#FFFFFF"
+                    android:scaleType="centerInside"
                     android:focusable="true"
-                    android:contentDescription="@string/player_sub_track"
+                    android:contentDescription="@string/player_audio_track"
                     android:nextFocusLeft="@id/btn_fast_forward"
-                    android:nextFocusRight="@id/tv_speed"
+                    android:nextFocusRight="@id/btn_more"
                     android:layout_marginStart="16dp" />
 
-                <TextView
-                    android:id="@+id/tv_speed"
-                    android:layout_width="wrap_content"
+                <ImageButton
+                    android:id="@+id/btn_more"
+                    android:layout_width="56dp"
                     android:layout_height="56dp"
-                    android:text="1.0x"
-                    android:textColor="#FFFFFF"
-                    android:textSize="16sp"
-                    android:gravity="center"
-                    android:paddingHorizontal="16dp"
-                    android:layout_marginStart="16dp"
+                    android:src="@drawable/ic_more_vert"
                     android:background="@drawable/selector_btn_player"
+                    android:scaleType="centerInside"
                     android:focusable="true"
-                    android:clickable="true"
-                    android:nextFocusLeft="@id/btn_sub_track" />
+                    android:contentDescription="@string/player_more"
+                    android:nextFocusLeft="@id/btn_audio_track"
+                    android:layout_marginStart="16dp" />
 
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
+
+    <!-- Overflow menu panel (right-anchored, VLC-style) -->
+    <ScrollView
+        android:id="@+id/panel_menu"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:background="#F2141414"
+        android:minWidth="320dp"
+        android:visibility="gone"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/menu_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingVertical="12dp" />
+    </ScrollView>
+
+    <!-- Track / delay selector panel (bottom sheet style) -->
+    <ScrollView
+        android:id="@+id/panel_tracks"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#F2000000"
+        android:maxHeight="420dp"
+        android:visibility="gone"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/tracks_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingVertical="8dp" />
+    </ScrollView>
 
 </FrameLayout>
