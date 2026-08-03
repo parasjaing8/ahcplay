@@ -7,7 +7,9 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
-    <uses-feature android:name="android.software.leanback" android:required="true" />
+    <!-- Leanback must stay optional: required="true" makes Play filter the app out for
+         every phone and tablet, which is the primary target now. -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <application
@@ -24,10 +26,11 @@
             android:configChanges="orientation|screenSize|keyboard|keyboardHidden|navigation"
             android:exported="true"
             android:label="@string/app_name"
-            android:screenOrientation="landscape"
+            android:screenOrientation="sensorLandscape"
             android:windowSoftInputMode="adjustNothing">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
@@ -36,7 +39,8 @@
             android:name=".player.PlayerActivity"
             android:configChanges="orientation|screenSize|keyboard|keyboardHidden|navigation"
             android:exported="false"
-            android:screenOrientation="landscape"
+            android:screenOrientation="sensorLandscape"
+            android:supportsPictureInPicture="true"
             android:windowSoftInputMode="adjustNothing" />
 
     </application>
