@@ -23,7 +23,7 @@ import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 
-class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
+class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback, PlayerGestures.Callbacks {
 
     companion object {
         const val EXTRA_URI = "extra_uri"
@@ -35,6 +35,8 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
         private const val PROGRESS_UPDATE_INTERVAL_MS = 500L
         private const val HISTORY_SAVE_INTERVAL_MS = 30_000L
         private const val US_PER_MS = 1000L
+        private const val DUCKED_VOLUME = 30
+        private const val FULL_VOLUME = 100
     }
 
     private lateinit var libVlc: LibVLC
@@ -56,11 +58,13 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var tvTitle: TextView
     private lateinit var seekIndicator: TextView
 
-    private lateinit var playerMenu: PlayerMenu
+    internal lateinit var playerMenu: PlayerMenu
     private lateinit var trackPanel: TrackPanel
+    private lateinit var gestures: PlayerGestures
+    private lateinit var audioFocus: PlayerAudioFocus
 
-    private lateinit var uri: String
-    private lateinit var title: String
+    internal lateinit var uri: String
+    internal lateinit var title: String
     private var sourceId: Long = 0L
     private var resumePositionMs: Long = 0L
     private var surfaceReady = false
@@ -69,10 +73,8 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var isSeeking = false
     private var isLocked = false
 
-    var currentSpeed = 1.0f
-        private set
-    var repeatOne = false
-        private set
+    internal var currentSpeed = 1.0f
+    internal var repeatOne = false
     private var videoScale = VideoScale.BEST_FIT
 
     val abRepeat = AbRepeat()
@@ -167,6 +169,14 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
             }
         }
 
+        audioFocus = PlayerAudioFocus(
+            context = this,
+            onPause = { if (mediaPlayer.isPlaying) mediaPlayer.pause() },
+            onResume = { if (!mediaPlayer.isPlaying) mediaPlayer.play() },
+            onDuck = { ducked -> mediaPlayer.volume = if (ducked) DUCKED_VOLUME else FULL_VOLUME }
+        )
+        audioFocus.request()
+
         prepareMedia(uri)
         showControls()
         handler.postDelayed(progressRunnable, PROGRESS_UPDATE_INTERVAL_MS)
@@ -212,56 +222,6 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     // ---- Menu / panel plumbing -------------------------------------------------
 
-    fun onMenuItemSelected(id: PlayerMenu.Id) {
-        playerMenu.hide()
-        when (id) {
-            PlayerMenu.Id.LOCK -> setLocked(true)
-            PlayerMenu.Id.SLEEP_TIMER -> PlayerDialogs.sleepTimer(this) { minutes ->
-                sleepTimer.set(minutes)
-                toast(
-                    if (minutes > 0) getString(R.string.sleep_set, minutes)
-                    else getString(R.string.sleep_cancelled)
-                )
-            }
-            PlayerMenu.Id.PLAYBACK_SPEED -> PlayerDialogs.speed(this, currentSpeed) { setSpeed(it) }
-            PlayerMenu.Id.JUMP_TO_TIME -> PlayerDialogs.jumpToTime(this, mediaPlayer.length) { target ->
-                mediaPlayer.time = target
-                showSeekIndicator(target)
-            }
-            PlayerMenu.Id.EQUALIZER -> PlayerDialogs.equalizer(this, mediaPlayer)
-            PlayerMenu.Id.REPEAT_MODE -> PlayerDialogs.repeatMode(this, repeatOne) { repeatOne = it }
-            PlayerMenu.Id.VIDEO_INFO -> PlayerDialogs.videoInfo(this, mediaPlayer, title, uri)
-            PlayerMenu.Id.AB_REPEAT -> toast(abRepeat.advance(mediaPlayer.time, this))
-            PlayerMenu.Id.CHAPTERS -> PlayerDialogs.chapters(this, mediaPlayer) { target ->
-                mediaPlayer.time = target
-                showSeekIndicator(target)
-            }
-            PlayerMenu.Id.POPUP_PLAYER -> enterPopupPlayer()
-            PlayerMenu.Id.BOOKMARKS,
-            PlayerMenu.Id.SAVE_PLAYLIST,
-            PlayerMenu.Id.PLAY_AS_AUDIO,
-            PlayerMenu.Id.CONTROL_SETTINGS,
-            PlayerMenu.Id.TIPS -> toast(getString(R.string.coming_soon))
-        }
-        showControls()
-    }
-
-    /** Picture-in-picture. Guarded because minSdk is 23 and TV devices have no PiP mode. */
-    private fun enterPopupPlayer() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            toast(getString(R.string.not_supported_on_device))
-            return
-        }
-        val track = mediaPlayer.currentVideoTrack
-        val builder = PictureInPictureParams.Builder()
-        if (track != null && track.width > 0 && track.height > 0) {
-            builder.setAspectRatio(Rational(track.width, track.height))
-        }
-        closePanels()
-        hideControls()
-        enterPictureInPictureMode(builder.build())
-    }
-
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         // No room for chrome in the PiP window; restore it when the user expands again.
@@ -285,12 +245,12 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
-    private fun setSpeed(speed: Float) {
+    internal fun setSpeed(speed: Float) {
         currentSpeed = speed
         mediaPlayer.rate = speed
     }
 
-    private fun setLocked(locked: Boolean) {
+    internal fun setLocked(locked: Boolean) {
         isLocked = locked
         if (locked) {
             hideControls()
@@ -303,7 +263,7 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private fun anyPanelVisible(): Boolean = playerMenu.isVisible || trackPanel.isVisible
 
-    private fun closePanels() {
+    internal fun closePanels() {
         playerMenu.hide()
         trackPanel.hide()
     }
@@ -363,8 +323,40 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
         btnMore.setOnClickListener { openMenu() }
 
-        // Touch devices get no key events, so the video surface itself toggles the overlay.
-        surfaceView.setOnClickListener { onVideoTapped() }
+        // Touch devices get no key events, so the video surface carries the gesture layer.
+        gestures = PlayerGestures(this, this)
+        surfaceView.setOnTouchListener(gestures)
+    }
+
+    // ---- Gesture callbacks -------------------------------------------------------
+
+    override fun isGestureAllowed(): Boolean = !isLocked && !anyPanelVisible()
+
+    override fun onSingleTap() = onVideoTapped()
+
+    override fun onSeekBy(deltaMs: Long) = seek(deltaMs)
+
+    override fun onSeekScrubbing(deltaMs: Long) {
+        val duration = mediaPlayer.length.takeIf { it > 0 } ?: return
+        val target = (mediaPlayer.time + deltaMs).coerceIn(0L, duration)
+        val sign = if (deltaMs >= 0) "+" else "-"
+        showIndicator("${formatTime(target)}  [$sign${formatTime(kotlin.math.abs(deltaMs))}]")
+    }
+
+    override fun onVolumeChanged(fraction: Float) {
+        val level = audioFocus.adjustVolume(fraction)
+        showIndicator("Volume  ${(level * 100).toInt()}%")
+    }
+
+    override fun onBrightnessChanged(fraction: Float) {
+        val level = gestures.adjustBrightness(fraction)
+        showIndicator("Brightness  ${(level * 100).toInt()}%")
+    }
+
+    override fun onPinchToggle() {
+        videoScale = if (videoScale == VideoScale.BEST_FIT) VideoScale.FILL else VideoScale.BEST_FIT
+        videoScale.apply(mediaPlayer, surfaceView.width, surfaceView.height)
+        showIndicator(videoScale.label)
     }
 
     private fun onVideoTapped() {
@@ -399,14 +391,16 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
         showSeekIndicator(newTime)
     }
 
-    private fun showSeekIndicator(posMs: Long) {
-        seekIndicator.text = formatTime(posMs)
+    internal fun showSeekIndicator(posMs: Long) = showIndicator(formatTime(posMs))
+
+    private fun showIndicator(text: String) {
+        seekIndicator.text = text
         seekIndicator.visibility = View.VISIBLE
         handler.removeCallbacks(hideSeekIndicatorRunnable)
         handler.postDelayed(hideSeekIndicatorRunnable, HIDE_SEEK_INDICATOR_DELAY_MS)
     }
 
-    private fun showControls() {
+    internal fun showControls() {
         if (isLocked) return
         val wasHidden = !controlsVisible
         controlsLayout.visibility = View.VISIBLE
@@ -417,7 +411,7 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
         resetHideTimer()
     }
 
-    private fun hideControls() {
+    internal fun hideControls() {
         controlsLayout.visibility = View.GONE
         controlsVisible = false
     }
@@ -492,6 +486,7 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
         sleepTimer.cancel()
+        audioFocus.abandon()
         saveHistory()
         mediaPlayer.stop()
         mediaPlayer.vlcVout.detachViews()

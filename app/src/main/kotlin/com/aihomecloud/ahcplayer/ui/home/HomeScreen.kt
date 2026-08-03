@@ -65,6 +65,8 @@ fun HomeScreen(
     val sources by vm.sources.collectAsStateWithLifecycle()
     val continueWatching by vm.continueWatching.collectAsStateWithLifecycle()
     val libraryStats by vm.libraryStats.collectAsStateWithLifecycle()
+    val discovered by vm.discovered.collectAsStateWithLifecycle()
+    val scanning by vm.scanning.collectAsStateWithLifecycle()
     val ahcSources = sources.filter { it.sourceType == SourceType.AHC }
     val lastUsedSourceId = continueWatching.firstOrNull()?.sourceId
 
@@ -81,6 +83,9 @@ fun HomeScreen(
         ClassicHomeLayout(
             sources = sources,
             continueWatching = continueWatching,
+            discovered = discovered,
+            scanning = scanning,
+            onRescan = vm::startScan,
             onBrowseSource = onBrowseSource,
             onAddSource = onAddSource,
             onSettings = onSettings,
@@ -378,6 +383,9 @@ private fun ProfileCard(
 private fun ClassicHomeLayout(
     sources: List<MediaSource>,
     continueWatching: List<WatchHistory>,
+    discovered: List<com.aihomecloud.ahcplayer.data.source.LanHost>,
+    scanning: Boolean,
+    onRescan: () -> Unit,
     onBrowseSource: (MediaSource) -> Unit,
     onAddSource: () -> Unit,
     onSettings: () -> Unit,
@@ -399,6 +407,12 @@ private fun ClassicHomeLayout(
                         }
                     }
                 }
+                DiscoveredSection(
+                    hosts = discovered,
+                    scanning = scanning,
+                    onRescan = onRescan,
+                    onAdd = { onAddSource() }
+                )
                 SectionRow(title = "My Sources") {
                     sources.forEach { src ->
                         SourceCard(source = src, onClick = { onBrowseSource(src) })
