@@ -32,6 +32,27 @@
   verified end-to-end).
 
 ## Open bugs (2026-08-03)
+### Found on Fire TV AFTMM (now at 192.168.0.62:5555, was .214), API 25
+- [ ] **Host/IP field unreachable by D-pad on Add SMB Source.** Once focus reaches
+  the Share field, UP does not move to Host. Verified with `uiautomator dump`:
+  Host is `focusable=true focused=false` while Share holds focus, and focus is
+  unchanged after an isolated UP press — so it is a traversal failure, not an
+  unfocusable field. This blocks adding an SMB source on TV. Needs explicit
+  `focusProperties { up = ... }` wiring in `AhcTextField` / SetupScreen.
+- [ ] **RIGHT does not cross from the left column to the right panel** on the
+  Add Source screen; "Add SMB Source" is only reachable via DOWN-then-RIGHT.
+- [ ] **Nothing has focus on entering the SMB form** — Compose does not auto-focus;
+  needs `FocusRequester` + `LaunchedEffect` per TV screen.
+- [ ] **Old AHC discovery reports "No devices found" on Fire TV**, while the new
+  `LanScanner` on Home finds four AHC hosts on the same network at the same moment.
+  `DiscoverViewModel.probeHost` (port 8443) is failing where a plain TCP connect
+  succeeds — likely the TLS probe, not reachability. Consider replacing that scan
+  with `LanScanner`.
+- [ ] **Fire TV full-screen IME traps text entry.** ENTER activates the highlighted
+  on-screen key instead of the field's imeAction, so `input text` lands in whichever
+  field opened the IME. Affects automated testing, and means the IME "Next" button
+  is the only reliable field advance.
+
 - [ ] **Discovery cards do not prefill.** "Tap to add" on a discovered host opens the
   Add Source screen without carrying the IP across, so the user still types it.
   Needs the host plumbed through the nav route into `SetupScreen`.
