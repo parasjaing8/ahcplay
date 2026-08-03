@@ -80,6 +80,8 @@ private val storagePermission: String =
 private fun hasStoragePermission(context: android.content.Context): Boolean =
     ContextCompat.checkSelfPermission(context, storagePermission) == PackageManager.PERMISSION_GRANTED
 
+private const val AHC_PORT = 8443
+
 sealed class Screen {
     object Home : Screen()
     object Discover : Screen()
@@ -155,7 +157,13 @@ fun AppNavHost(onPlayVideo: (uri: String, title: String, sourceId: Long) -> Unit
             is Screen.Home -> HomeScreen(
                 onBrowseSource = { src -> openSource(src) },
                 onAddSource = { navigate(Screen.Discover) },
-                onAddDiscoveredHost = { address -> navigate(Screen.Setup(address)) },
+                onAddDiscoveredHost = { host ->
+                    // An AiHomeCloud device belongs in the profile flow, not the raw SMB
+                    // form — routing it to SMB would create a source that can never use
+                    // profiles, server thumbnails or per-user private libraries.
+                    if (host.hasAhc) navigate(Screen.ProfileSelect(host.address, AHC_PORT, host.address))
+                    else navigate(Screen.Setup(host.address))
+                },
                 onSettings = { navigate(Screen.Settings) },
                 onResume = { history -> onPlayVideo(history.uri, history.title, history.sourceId) }
             )

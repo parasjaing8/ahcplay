@@ -83,6 +83,7 @@ internal fun MediaHero(
         if (imageUrl != null) {
             SubcomposeAsyncImage(
                 model = imageUrl,
+                imageLoader = LocalAhcImageLoader.current ?: coil.compose.LocalImageLoader.current,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

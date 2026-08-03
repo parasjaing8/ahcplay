@@ -58,7 +58,7 @@ private const val ProfileAutoSelectMs = 3000
 fun HomeScreen(
     onBrowseSource: (MediaSource) -> Unit,
     onAddSource: () -> Unit,
-    onAddDiscoveredHost: (String) -> Unit,
+    onAddDiscoveredHost: (com.aihomecloud.ahcplayer.data.source.LanHost) -> Unit,
     onSettings: () -> Unit,
     onResume: (WatchHistory) -> Unit,
     vm: HomeViewModel = viewModel()
@@ -390,7 +390,7 @@ private fun ClassicHomeLayout(
     onRescan: () -> Unit,
     onBrowseSource: (MediaSource) -> Unit,
     onAddSource: () -> Unit,
-    onAddDiscoveredHost: (String) -> Unit,
+    onAddDiscoveredHost: (com.aihomecloud.ahcplayer.data.source.LanHost) -> Unit,
     onSettings: () -> Unit,
     onResume: (WatchHistory) -> Unit
 ) {
@@ -416,7 +416,7 @@ private fun ClassicHomeLayout(
                     onRescan = onRescan,
                     // Carry the discovered address into the Add Source form so the
                     // user never re-types an IP the app already found.
-                    onAdd = { host -> onAddDiscoveredHost(host.address) }
+                    onAdd = { host -> onAddDiscoveredHost(host) }
                 )
                 SectionRow(title = "My Sources") {
                     sources.forEach { src ->

@@ -10,6 +10,9 @@ import com.aihomecloud.ahcplayer.data.model.WatchHistory
 import com.aihomecloud.ahcplayer.data.source.BrowseFetcher
 import com.aihomecloud.ahcplayer.data.metadata.MediaMetadata
 import com.aihomecloud.ahcplayer.data.metadata.MetadataRepository
+import com.aihomecloud.ahcplayer.data.ahc.AhcImageLoaders
+import com.aihomecloud.ahcplayer.data.ahc.ahcThumbnailUrl
+import coil.ImageLoader
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +28,8 @@ sealed class BrowseState {
     data class Success(val items: List<BrowseItem>) : BrowseState()
     data class Error(val message: String) : BrowseState()
 }
+
+private const val AHC_DEFAULT_PORT = 8443
 
 class BrowseViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -89,7 +94,7 @@ class BrowseViewModel(app: Application) : AndroidViewModel(app) {
                 allItems = items
                 _state.value = BrowseState.Success(items)
                 items.filter { it.isVideo }.forEach { item ->
-                    launch { fetchMetadata(item.name) }
+                    launch { fetchMetadata(item) }
                 }
             } catch (e: Exception) {
                 _state.value = BrowseState.Error(e.message ?: "Browse failed")
@@ -100,9 +105,35 @@ class BrowseViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun fetchItems(uri: String): List<BrowseItem> =
         BrowseFetcher.fetchItems(getApplication(), ahcRepo, uri)
 
-    private suspend fun fetchMetadata(filename: String) {
-        val meta = metadataSemaphore.withPermit { metaRepo.get(filename) } ?: return
-        _metadata.update { it + (filename to meta) }
+    private suspend fun fetchMetadata(item: BrowseItem) {
+        val meta = metadataSemaphore.withPermit { metaRepo.get(item.name) } ?: return
+        // Artwork comes from a frame the server already extracted from the file itself.
+        // The URL is derived from the item's own URI, so it needs no persistence.
+        val withArt = if (meta.posterUrl == null) meta.copy(posterUrl = serverThumbnailFor(item)) else meta
+        _metadata.update { it + (item.name to withArt) }
+    }
+
+    /** Server-generated thumbnail for an AiHomeCloud-hosted video, or null for other sources. */
+    private fun serverThumbnailFor(item: BrowseItem): String? {
+        if (item.isDirectory || !item.uri.startsWith("ahc://")) return null
+        val u = android.net.Uri.parse(item.uri)
+        val host = u.host ?: return null
+        val path = u.path?.takeIf { it.isNotBlank() } ?: return null
+        return ahcThumbnailUrl(host, u.port.takeIf { it > 0 } ?: AHC_DEFAULT_PORT, path)
+    }
+
+    /**
+     * Coil loader for the server currently being browsed. Per-host because each device's
+     * certificate is pinned individually — one shared client could not pin correctly.
+     */
+    fun imageLoaderFor(uri: String): ImageLoader? {
+        if (!uri.startsWith("ahc://")) return null
+        val u = android.net.Uri.parse(uri)
+        val host = u.host ?: return null
+        val user = u.getQueryParameter("user").orEmpty()
+        return AhcImageLoaders.forHost(
+            getApplication(), ahcRepo, host, u.port.takeIf { it > 0 } ?: AHC_DEFAULT_PORT, user
+        )
     }
 
     fun push(uri: String) {

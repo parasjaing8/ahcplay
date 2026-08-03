@@ -46,6 +46,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aihomecloud.ahcplayer.data.model.BrowseItem
@@ -102,6 +103,10 @@ fun BrowseScreen(
 
     BackHandler(enabled = detailsItem == null) { navigateBack() }
 
+    // Thumbnails are served by the AiHomeCloud server this source belongs to, over a
+    // connection pinned to that specific device — so the loader is scoped to the source
+    // rather than shared globally.
+    CompositionLocalProvider(LocalAhcImageLoader provides vm.imageLoaderFor(currentUri)) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -193,6 +198,7 @@ fun BrowseScreen(
                 }
             )
         }
+    }
     }
 }
 

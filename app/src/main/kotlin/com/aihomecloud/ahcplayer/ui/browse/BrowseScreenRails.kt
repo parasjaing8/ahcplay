@@ -49,6 +49,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import coil.ImageLoader
 import coil.compose.SubcomposeAsyncImage
 import com.aihomecloud.ahcplayer.data.model.BrowseItem
 import com.aihomecloud.ahcplayer.data.model.WatchHistory
@@ -521,6 +524,13 @@ internal fun StaticFileCard(item: BrowseItem) {
     }
 }
 
+/**
+ * Coil loader for the server being browsed. Null means "no AiHomeCloud server", in which
+ * case Coil's default applies. Scoped this way because certificate pins are per-device,
+ * so the correct loader changes with the source rather than being global.
+ */
+internal val LocalAhcImageLoader = staticCompositionLocalOf<ImageLoader?> { null }
+
 @Composable
 internal fun PosterImage(
     url: String?,
@@ -528,14 +538,27 @@ internal fun PosterImage(
     contentScale: ContentScale = ContentScale.Crop
 ) {
     if (url != null) {
-        SubcomposeAsyncImage(
-            model = url,
-            contentDescription = null,
-            contentScale = contentScale,
-            modifier = Modifier.fillMaxSize(),
-            loading = { PosterPlaceholder(title) },
-            error = { PosterPlaceholder(title) }
-        )
+        val loader = LocalAhcImageLoader.current
+        if (loader != null) {
+            SubcomposeAsyncImage(
+                model = url,
+                imageLoader = loader,
+                contentDescription = null,
+                contentScale = contentScale,
+                modifier = Modifier.fillMaxSize(),
+                loading = { PosterPlaceholder(title) },
+                error = { PosterPlaceholder(title) }
+            )
+        } else {
+            SubcomposeAsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = contentScale,
+                modifier = Modifier.fillMaxSize(),
+                loading = { PosterPlaceholder(title) },
+                error = { PosterPlaceholder(title) }
+            )
+        }
     } else {
         PosterPlaceholder(title)
     }
