@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.aihomecloud.ahcplayer.data.model.BrowseItem
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.async
 import com.aihomecloud.ahcplayer.data.prefs.SecurePrefs
 
 private const val TAG = "AhcRepository"
@@ -106,12 +108,55 @@ class AhcRepository(context: Context) {
         return try {
             fetchPage(api, token, nasPath, smbShare, host, username)
         } catch (e: retrofit2.HttpException) {
-            if (e.code() == 401 || e.code() == 403) {
-                clearToken(host, username)
-                val newToken = getOrFetchToken(host, port, username)
-                fetchPage(api, newToken, nasPath, smbShare, host, username)
-            } else throw e
+            when (e.code()) {
+                // Stale credential: clear and retry once.
+                401 -> {
+                    clearToken(host, username)
+                    fetchPage(api, getOrFetchToken(host, port, username), nasPath, smbShare, host, username)
+                }
+                // A permission decision, not an expired token. Re-authenticating cannot help,
+                // and discarding a valid token here just churns credentials. The server
+                // deliberately refuses a non-admin listing the NAS root or `personal`
+                // directly, so at the root we enumerate the scopes this profile can see.
+                403 -> if (isNasRoot(nasPath)) {
+                    listVisibleScopes(api, token, smbShare, host, username)
+                } else throw e
+                else -> throw e
+            }
         }
+    }
+
+    private fun isNasRoot(nasPath: String): Boolean {
+        val trimmed = nasPath.trim().trimEnd('/')
+        return trimmed.isEmpty() || trimmed == "/srv/nas"
+    }
+
+    /**
+     * Top-level scopes this profile is allowed to see. Probed rather than assumed, so a
+     * profile without access to a scope simply does not get it — the server stays the
+     * authority on permission and the client never has to model it.
+     */
+    private suspend fun listVisibleScopes(
+        api: AhcApiService,
+        token: String,
+        smbShare: String,
+        host: String,
+        username: String
+    ): List<BrowseItem> = kotlinx.coroutines.coroutineScope {
+        CANDIDATE_SCOPES.map { scope ->
+            async {
+                runCatching { fetchPage(api, token, "/$scope", smbShare, host, username) }
+                    .getOrNull()
+                    ?.let {
+                        BrowseItem(
+                            name = scope,
+                            uri = "ahc://$host:8443/$scope?share=$smbShare" +
+                                if (username.isEmpty()) "" else "&user=$username",
+                            isDirectory = true
+                        )
+                    }
+            }
+        }.awaitAll().filterNotNull()
     }
 
     // For profile tokens: try cached first; if missing, auto-login with empty PIN (no-PIN profiles).
@@ -151,6 +196,9 @@ class AhcRepository(context: Context) {
     }
 
     companion object {
+        /** Top-level scopes an AiHomeCloud server organises content into. */
+        private val CANDIDATE_SCOPES = listOf("entertainment", "family", "personal")
+
         fun nasPathToSmb(host: String, nasPath: String, share: String): String {
             val nasRoot = "/srv/nas/"
             val relative = if (nasPath.startsWith(nasRoot)) nasPath.removePrefix(nasRoot)
