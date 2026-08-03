@@ -56,3 +56,23 @@
 - [ ] **Discovery cards do not prefill.** "Tap to add" on a discovered host opens the
   Add Source screen without carrying the IP across, so the user still types it.
   Needs the host plumbed through the nav route into `SetupScreen`.
+
+## Findings from the 2026-08-04 autonomous block
+- [ ] **Debug builds silently wipe on a bad migration.** `AppDatabase` applies
+  `fallbackToDestructiveMigration()` when `BuildConfig.DEBUG`, so a broken migration
+  destroys sources/history/metadata instead of throwing. That means a migration bug
+  looks like success during development and only surfaces in release. Left as-is
+  deliberately — removing it makes debug builds crash on schema mismatch, which is
+  correct but is a workflow change worth a conscious decision. Decide, don't drift.
+- [ ] **Discovered AHC hosts now route to the SMB form.** `LanHost` carries `hasAhc`,
+  and a host with `hasAhc = true` was previously reachable via the Discover screen's
+  AHC path (-> ProfileSelect). Tapping its card on Home now sends it to the SMB form
+  instead. Should branch on `hasAhc` and route AHC hosts to the profile flow.
+- [ ] **D-pad fixes are compile-verified only** — needs a Fire TV pass on
+  Name/Host/Share/Connect traversal both directions, and RIGHT from a device card
+  into "Add SMB Source".
+- [ ] **v7 -> v8 upgrade never run on a populated device database.** Verified by SQL
+  execution and by matching Room's generated expectations, but not in place on hardware.
+- [ ] **Server thumbnails are wired but not consumed.** `AhcImageLoaders` +
+  `ahcThumbnailUrl` + `AhcRepository.imageClientFor` exist; the browse layer does not
+  yet request them, so posters remain letter tiles. This is the replacement for TMDB.
