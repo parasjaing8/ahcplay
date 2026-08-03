@@ -63,3 +63,30 @@ interface WatchHistoryDao {
     suspend fun deleteAll()
 }
 
+@Dao
+interface BookmarkDao {
+    @Query("SELECT * FROM bookmark WHERE uri = :uri ORDER BY positionMs ASC")
+    suspend fun getForUri(uri: String): List<BookmarkEntity>
+
+    @Insert
+    suspend fun insert(bookmark: BookmarkEntity): Long
+
+    @Delete
+    suspend fun delete(bookmark: BookmarkEntity)
+}
+
+@Dao
+interface PlaylistDao {
+    @Insert
+    suspend fun insertPlaylist(playlist: PlaylistEntity): Long
+
+    @Insert
+    suspend fun insertItem(item: PlaylistItemEntity): Long
+
+    @Query("SELECT * FROM playlist ORDER BY createdAt DESC")
+    fun getAllPlaylists(): Flow<List<PlaylistEntity>>
+
+    @Query("SELECT * FROM playlist_item WHERE playlistId = :playlistId ORDER BY position ASC")
+    fun getItems(playlistId: Long): Flow<List<PlaylistItemEntity>>
+}
+

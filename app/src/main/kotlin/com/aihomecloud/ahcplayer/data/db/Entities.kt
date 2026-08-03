@@ -40,3 +40,28 @@ data class MediaMetadataEntity(
     val overview: String?,
     val cachedAt: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "bookmark")
+data class BookmarkEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val uri: String,
+    val positionMs: Long,
+    val label: String,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "playlist")
+data class PlaylistEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "playlist_item")
+data class PlaylistItemEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val playlistId: Long,
+    val uri: String,
+    val title: String,
+    val position: Int
+)

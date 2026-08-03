@@ -17,7 +17,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -25,8 +27,10 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -39,13 +43,22 @@ import com.aihomecloud.ahcplayer.ui.theme.*
 @Composable
 fun SetupScreen(
     onSourceSelected: (MediaSource) -> Unit,
+    prefillHost: String = "",
     vm: SetupViewModel = viewModel()
 ) {
     val sources by vm.sources.collectAsStateWithLifecycle()
     var name by remember { mutableStateOf("NAS") }
-    var host by remember { mutableStateOf("") }
+    var host by remember { mutableStateOf(prefillHost) }
     var share by remember { mutableStateOf("media") }
+    val nameFocus = remember { FocusRequester() }
+    val hostFocus = remember { FocusRequester() }
+    val shareFocus = remember { FocusRequester() }
     val connectFocus = remember { FocusRequester() }
+
+    // Compose never auto-focuses; without this the screen opens with nothing
+    // highlighted and the D-pad has no starting point. requestFocus() throws if the
+    // target is not attached yet, so the first frame is guarded.
+    LaunchedEffect(Unit) { runCatching { nameFocus.requestFocus() } }
 
     Row(
         modifier = Modifier
@@ -62,17 +75,30 @@ fun SetupScreen(
         ) {
             Text("Add SMB Source", style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
             Spacer(Modifier.height(4.dp))
+            // Explicit up/down traversal: the fields sit inside a scrolling column and
+            // the default 2D focus search does not reliably reach Host from Share.
             AhcTextField(value = name, onValueChange = { name = it }, label = "Name",
-                imeAction = ImeAction.Next)
+                imeAction = ImeAction.Next,
+                modifier = Modifier
+                    .focusRequester(nameFocus)
+                    .focusProperties { down = hostFocus })
             AhcTextField(value = host, onValueChange = { host = it }, label = "Host / IP",
-                imeAction = ImeAction.Next)
+                imeAction = ImeAction.Next,
+                modifier = Modifier
+                    .focusRequester(hostFocus)
+                    .focusProperties { up = nameFocus; down = shareFocus })
             AhcTextField(value = share, onValueChange = { share = it }, label = "Share",
                 imeAction = ImeAction.Done,
-                keyboardActions = KeyboardActions(onDone = { connectFocus.requestFocus() }))
+                keyboardActions = KeyboardActions(onDone = { connectFocus.requestFocus() }),
+                modifier = Modifier
+                    .focusRequester(shareFocus)
+                    .focusProperties { up = hostFocus; down = connectFocus })
             Spacer(Modifier.height(8.dp))
             AhcButton(
                 text = "Connect",
-                modifier = Modifier.focusRequester(connectFocus),
+                modifier = Modifier
+                    .focusRequester(connectFocus)
+                    .focusProperties { up = shareFocus },
                 onClick = {
                     if (host.isNotBlank() && share.isNotBlank()) {
                         val srcName = name.ifBlank { "$host/$share" }
@@ -131,11 +157,13 @@ fun AhcTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
+    modifier: Modifier = Modifier,
     imeAction: ImeAction = ImeAction.Next,
     keyboardActions: KeyboardActions = KeyboardActions.Default
 ) {
     var editing by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
 
     OutlinedTextField(
@@ -169,6 +197,24 @@ fun AhcTextField(
         modifier = Modifier
             .fillMaxWidth()
             .focusRequester(focusRequester)
+            .then(modifier)
+            // While highlighted-but-not-editing the text field still consumes DPAD
+            // up/down as cursor movement, which strands focus on the field. Take those
+            // keys first and hand them to the focus system so the traversal wired by
+            // focusProperties actually runs. Once editing, arrows belong to the cursor.
+            .onPreviewKeyEvent { event ->
+                val vertical = event.key == Key.DirectionUp || event.key == Key.DirectionDown
+                if (editing || !vertical) {
+                    false
+                } else {
+                    if (event.type == KeyEventType.KeyDown) {
+                        focusManager.moveFocus(
+                            if (event.key == Key.DirectionUp) FocusDirection.Up else FocusDirection.Down
+                        )
+                    }
+                    true
+                }
+            }
             // On a touchscreen a tap must start editing directly; the D-pad path below
             // only highlights first, which would otherwise leave the field unusable by touch.
             .then(

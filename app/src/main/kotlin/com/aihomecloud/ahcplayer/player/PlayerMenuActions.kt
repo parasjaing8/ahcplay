@@ -34,8 +34,8 @@ internal fun PlayerActivity.onMenuItemSelected(id: PlayerMenu.Id) {
             showSeekIndicator(target)
         }
         PlayerMenu.Id.POPUP_PLAYER -> enterPopupPlayer()
-        PlayerMenu.Id.BOOKMARKS,
-        PlayerMenu.Id.SAVE_PLAYLIST,
+        PlayerMenu.Id.BOOKMARKS -> PlayerLibraryDialogs.bookmarks(this)
+        PlayerMenu.Id.SAVE_PLAYLIST -> PlayerLibraryDialogs.savePlaylist(this)
         PlayerMenu.Id.PLAY_AS_AUDIO,
         PlayerMenu.Id.CONTROL_SETTINGS,
         PlayerMenu.Id.TIPS -> toast(getString(R.string.coming_soon))

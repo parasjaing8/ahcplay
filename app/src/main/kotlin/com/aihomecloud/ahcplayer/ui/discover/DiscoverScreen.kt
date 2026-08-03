@@ -3,6 +3,7 @@ package com.aihomecloud.ahcplayer.ui.discover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.ImeAction
@@ -36,8 +38,16 @@ fun DiscoverScreen(
     val isScanning by vm.isScanning.collectAsStateWithLifecycle()
     val subnet by vm.subnet.collectAsStateWithLifecycle()
     var showManual by remember { mutableStateOf(false) }
+    // Left column is a focus group so both the initial focus request and RIGHT->LEFT
+    // traversal can target it without depending on which list item is composed.
+    val listFocus = remember { FocusRequester() }
+    val addSmbFocus = remember { FocusRequester() }
 
     LaunchedEffect(Unit) { vm.startScan() }
+
+    // Compose never auto-focuses; guarded because requesting focus before the target
+    // is attached throws.
+    LaunchedEffect(Unit) { runCatching { listFocus.requestFocus() } }
 
     Row(
         modifier = Modifier
@@ -47,7 +57,12 @@ fun DiscoverScreen(
         horizontalArrangement = Arrangement.spacedBy(48.dp)
     ) {
         // Left column: device list
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(listFocus)
+                .focusGroup()
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "AiHomeCloud Devices",
@@ -77,15 +92,20 @@ fun DiscoverScreen(
 
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(devices) { device ->
-                    DeviceCard(device = device, onClick = {
-                        onDeviceSelected(device.host, device.port, device.displayName)
-                    })
+                    DeviceCard(
+                        device = device,
+                        modifier = Modifier.focusProperties { right = addSmbFocus },
+                        onClick = {
+                            onDeviceSelected(device.host, device.port, device.displayName)
+                        }
+                    )
                 }
 
                 // Manual entry item at bottom
                 item {
                     ManualEntryRow(
                         expanded = showManual,
+                        modifier = Modifier.focusProperties { right = addSmbFocus },
                         onExpand = { showManual = true },
                         onConnect = { host, port -> onDeviceSelected(host, port, "AiHomeCloud @ $host") }
                     )
@@ -118,12 +138,20 @@ fun DiscoverScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary
             )
-            AhcButton(text = "Add SMB Source", onClick = onAddSmb)
+            AhcButton(
+                text = "Add SMB Source",
+                onClick = onAddSmb,
+                modifier = Modifier
+                    .focusRequester(addSmbFocus)
+                    .focusProperties { left = listFocus }
+            )
             Spacer(Modifier.weight(1f))
             var backFocused by remember { mutableStateOf(false) }
             TextButton(
                 onClick = onBack,
-                modifier = Modifier.onFocusChanged { backFocused = it.isFocused }
+                modifier = Modifier
+                    .focusProperties { left = listFocus }
+                    .onFocusChanged { backFocused = it.isFocused }
             ) {
                 Text("Back", color = if (backFocused) TextPrimary else TextMuted)
             }
@@ -132,11 +160,12 @@ fun DiscoverScreen(
 }
 
 @Composable
-private fun DeviceCard(device: AhcDeviceInfo, onClick: () -> Unit) {
+private fun DeviceCard(device: AhcDeviceInfo, onClick: () -> Unit, modifier: Modifier = Modifier) {
     var focused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(modifier)
             .clip(RoundedCornerShape(8.dp))
             .background(if (focused) BgCardFocused else BgCard)
             .then(if (focused) Modifier.border(Dimens.focusBorder, Accent, RoundedCornerShape(8.dp)) else Modifier)
@@ -161,7 +190,8 @@ private fun DeviceCard(device: AhcDeviceInfo, onClick: () -> Unit) {
 private fun ManualEntryRow(
     expanded: Boolean,
     onExpand: () -> Unit,
-    onConnect: (host: String, port: Int) -> Unit
+    onConnect: (host: String, port: Int) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var focused by remember { mutableStateOf(false) }
     var host by remember { mutableStateOf("") }
@@ -179,6 +209,7 @@ private fun ManualEntryRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(if (!expanded) Modifier
+                    .then(modifier)
                     .onFocusChanged { focused = it.isFocused }
                     .clickable { onExpand() }
                 else Modifier)

@@ -58,6 +58,7 @@ private const val ProfileAutoSelectMs = 3000
 fun HomeScreen(
     onBrowseSource: (MediaSource) -> Unit,
     onAddSource: () -> Unit,
+    onAddDiscoveredHost: (String) -> Unit,
     onSettings: () -> Unit,
     onResume: (WatchHistory) -> Unit,
     vm: HomeViewModel = viewModel()
@@ -88,6 +89,7 @@ fun HomeScreen(
             onRescan = vm::startScan,
             onBrowseSource = onBrowseSource,
             onAddSource = onAddSource,
+            onAddDiscoveredHost = onAddDiscoveredHost,
             onSettings = onSettings,
             onResume = onResume
         )
@@ -388,6 +390,7 @@ private fun ClassicHomeLayout(
     onRescan: () -> Unit,
     onBrowseSource: (MediaSource) -> Unit,
     onAddSource: () -> Unit,
+    onAddDiscoveredHost: (String) -> Unit,
     onSettings: () -> Unit,
     onResume: (WatchHistory) -> Unit
 ) {
@@ -411,7 +414,9 @@ private fun ClassicHomeLayout(
                     hosts = discovered,
                     scanning = scanning,
                     onRescan = onRescan,
-                    onAdd = { onAddSource() }
+                    // Carry the discovered address into the Add Source form so the
+                    // user never re-types an IP the app already found.
+                    onAdd = { host -> onAddDiscoveredHost(host.address) }
                 )
                 SectionRow(title = "My Sources") {
                     sources.forEach { src ->

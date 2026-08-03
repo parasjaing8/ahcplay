@@ -61,4 +61,17 @@
     <string name="delay_value">%1$d ms</string>
     <string name="not_supported_on_device">Not supported on this device</string>
     <string name="coming_soon">Coming soon</string>
+
+    <!-- Bookmarks -->
+    <string name="bookmarks_title">Bookmarks</string>
+    <string name="bookmarks_empty">No bookmarks yet</string>
+    <string name="bookmark_add">Add bookmark at current position</string>
+    <string name="bookmark_added">Bookmark added</string>
+    <string name="bookmark_delete_cd">Delete bookmark</string>
+
+    <!-- Save playlist -->
+    <string name="save_playlist_title">Save playlist</string>
+    <string name="playlist_name_hint">Playlist name</string>
+    <string name="playlist_name_invalid">Enter a playlist name</string>
+    <string name="playlist_saved">Saved to \"%1$s\"</string>
 </resources>

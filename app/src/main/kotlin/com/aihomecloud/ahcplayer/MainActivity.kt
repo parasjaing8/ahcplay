@@ -83,7 +83,8 @@ private fun hasStoragePermission(context: android.content.Context): Boolean =
 sealed class Screen {
     object Home : Screen()
     object Discover : Screen()
-    object Setup : Screen()
+    /** [prefillHost] pre-populates the SMB Host/IP field when arriving from a discovered host. */
+    data class Setup(val prefillHost: String = "") : Screen()
     object Settings : Screen()
     data class ProfileSelect(val host: String, val port: Int, val deviceName: String) : Screen()
     data class PinAuth(val source: MediaSource) : Screen()
@@ -154,12 +155,13 @@ fun AppNavHost(onPlayVideo: (uri: String, title: String, sourceId: Long) -> Unit
             is Screen.Home -> HomeScreen(
                 onBrowseSource = { src -> openSource(src) },
                 onAddSource = { navigate(Screen.Discover) },
+                onAddDiscoveredHost = { address -> navigate(Screen.Setup(address)) },
                 onSettings = { navigate(Screen.Settings) },
                 onResume = { history -> onPlayVideo(history.uri, history.title, history.sourceId) }
             )
             is Screen.Discover -> DiscoverScreen(
                 onDeviceSelected = { host, port, name -> navigate(Screen.ProfileSelect(host, port, name)) },
-                onAddSmb = { navigate(Screen.Setup) },
+                onAddSmb = { navigate(Screen.Setup()) },
                 onBack = { goBack() }
             )
             is Screen.ProfileSelect -> ProfileSelectScreen(
@@ -182,6 +184,7 @@ fun AppNavHost(onPlayVideo: (uri: String, title: String, sourceId: Long) -> Unit
             )
             is Screen.Settings -> SettingsScreen(onBack = { goBack() })
             is Screen.Setup -> SetupScreen(
+                prefillHost = s.prefillHost,
                 onSourceSelected = { src ->
                     backStack = listOf(Screen.Home)
                     screen = Screen.Browse(src)

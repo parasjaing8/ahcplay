@@ -9,14 +9,19 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.aihomecloud.ahcplayer.BuildConfig
 
 @Database(
-    entities = [SourceEntity::class, WatchHistoryEntity::class, MediaMetadataEntity::class],
-    version = 7,
+    entities = [
+        SourceEntity::class, WatchHistoryEntity::class, MediaMetadataEntity::class,
+        BookmarkEntity::class, PlaylistEntity::class, PlaylistItemEntity::class
+    ],
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun sourceDao(): SourceDao
     abstract fun watchHistoryDao(): WatchHistoryDao
     abstract fun mediaMetadataDao(): MediaMetadataDao
+    abstract fun bookmarkDao(): BookmarkDao
+    abstract fun playlistDao(): PlaylistDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -42,13 +47,33 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** Adds the bookmark and playlist tables. CREATE-only — no existing data touched. */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `bookmark` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`uri` TEXT NOT NULL, `positionMs` INTEGER NOT NULL, `label` TEXT NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL)"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `playlist` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`name` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `playlist_item` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`playlistId` INTEGER NOT NULL, `uri` TEXT NOT NULL, `title` TEXT NOT NULL, " +
+                        "`position` INTEGER NOT NULL)"
+                )
+            }
+        }
+
         fun get(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 "ahcplayer.db"
             )
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .apply { if (BuildConfig.DEBUG) fallbackToDestructiveMigration() }
                 .build().also { INSTANCE = it }
         }
