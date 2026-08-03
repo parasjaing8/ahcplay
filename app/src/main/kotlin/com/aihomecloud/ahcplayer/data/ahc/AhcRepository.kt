@@ -30,6 +30,16 @@ class AhcRepository(context: Context) {
         prefs.edit().remove(tokenKey(host, username)).apply()
     }
 
+    /**
+     * A client pinned to this host, for image loading. Shares the same TOFU pin store as
+     * [apiFor] so thumbnails are subject to exactly the same certificate check as API
+     * calls — a separately-pinned image path would be a hole in the same trust decision.
+     */
+    fun imageClientFor(host: String): okhttp3.OkHttpClient = buildAhcClient(
+        pinnedPin = prefs.getString(certPinKey(host), null),
+        onFirstSeen = { pin -> prefs.edit().putString(certPinKey(host), pin).apply() }
+    )
+
     // Builds a Retrofit client pinned to this host's certificate (TOFU on first contact).
     private fun apiFor(host: String, port: Int, connectTimeoutMs: Long = 10_000, readTimeoutMs: Long = 30_000): AhcApiService {
         val client = buildAhcClient(
