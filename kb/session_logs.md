@@ -87,3 +87,45 @@
   submission. Pushed `main` to both `chaitraparas/ahcplay` (origin) and
   `parasjaing8/ahcplay` (mirror, account-switch).
 
+
+## 2026-08-03 — VLC-parity player + phone/tablet reach
+
+Goal restated by Paras this session: AHC Player is to be a Netflix/JioHotstar-style
+app running on **any Android device**, playing from network SMB — not a TV-only app.
+Work was reprioritised around that.
+
+- Rebuilt the player overlay to VLC's option set, reimplemented from scratch.
+  libVLC stays linked (LGPL); no GPL app-layer code copied — copying VLC's own UI
+  would force ahcplay to be GPL and block a closed-source Play release.
+  New: `PlayerMenu.kt` (15-item overflow menu, data-driven, live status text),
+  `TrackPanel.kt` (collapsible Audio/Subtitles + delay controls),
+  `PlayerFeatures.kt` (sleep timer, speed, jump-to-time, equalizer presets,
+  repeat, video info, A-B repeat, chapters, video scaling, PiP) — `7dee7b0`.
+- Live-tested on the Lenovo tablet against SMB media on the Rock Pi
+  (`smb://192.168.0.241/media/entertainment`): browse, 1080p playback of
+  *Lupin III The First*, resume-from-history, overflow menu, track panel — all
+  verified by screenshot. Fire TV (192.168.0.214) was offline all session, so
+  **no D-pad hardware verification** was done on any of this.
+- Three touch bugs found only by testing on real hardware, all fixed:
+  1. `showControls()` was reachable only from `dispatchKeyEvent`, so tapping the
+     video did nothing — the player was unusable on a touchscreen.
+  2. `AhcTextField` gated editing behind D-pad centre, so a tap focused but never
+     typed — adding an SMB source on a phone/tablet was impossible — `ad08435`.
+  3. Track panel drew over the transport bar at 95% alpha; panels now replace it.
+- Distribution blockers fixed (`20eabc1`): `leanback` was `required="true"`, so
+  Play filtered the app out for every phone and tablet; only `LEANBACK_LAUNCHER`
+  was declared, so no app-drawer icon; both activities were landscape-pinned.
+  Now leanback optional + `LAUNCHER` + `sensorLandscape` + `supportsPictureInPicture`.
+- Merged `refactor/browsescreen-split-a11y` into `main` (fast-forward), which also
+  brought in the June BrowseScreen split + a11y commits (`3f64d07`, `d834065`) that
+  had been sitting unmerged. Those got de-facto device validation this session —
+  the whole Home -> Explore -> collections -> hero -> play path was exercised.
+  Pushed to `origin` (chaitraparas) only; `parasjaing8` mirror NOT pushed.
+
+**Outstanding**
+- Portrait unsupported: `sensorLandscape` is deliberate, since every Compose layout
+  is landscape-designed (Home wastes ~60% of a tablet screen). Responsive pass on
+  Home/Browse/Setup is the biggest remaining item for a phone-first app.
+- No poster/backdrop art — TMDB key was stripped in the June audit, so the
+  "Netflix look" is currently text-on-gradient. Needs a secret-handling decision.
+- Still stubbed: Bookmarks, Save Playlist, Play as audio, Control settings, Tips.
