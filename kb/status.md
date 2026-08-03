@@ -31,8 +31,8 @@
 - [x] Back up `release.jks` + `keystore.properties` (done -> `~/.secrets/ahcplay/`).
 - [x] Write store listing + screenshots + privacy policy page (done -> `kb/store/`,
   `aihomecloud.com/ahcplay/privacy` + `/support`).
-- [ ] Rebuild signed release bundle: `./gradlew bundleRelease` -> `app-release.aab`
-  (REQUIRED - existing AAB predates the `e5c4f75` Base64 crash fix).
+- [x] Rebuild signed release bundle: `./gradlew bundleRelease` -> `app-release.aab`
+  (rebuilt 2026-06-14, includes the `e5c4f75` Base64 crash fix).
 - [ ] Set up Play Console: Android TV form factor, content rating questionnaire, data safety section
   (declare TMDB network calls + AHC NAS connection, no PII collected).
 - [ ] Internal testing track first, then closed/open testing before production.
