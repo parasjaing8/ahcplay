@@ -99,3 +99,39 @@ claim Fire TV support, which is sideload-only.
 5. Internal test track first. The main AiHomeCloud app's open-testing track is currently blocked
    on a country-availability setting; check this listing's track countries at creation rather
    than discovering the same problem after upload.
+
+---
+
+# Correction 2026-08-05 — this is not a one-week task
+
+Written before we knew the developer account is subject to Google's closed-testing requirement
+for personal accounts created after 2023-11-13:
+
+> Before you can apply for production access, you need to run a closed test which meets our
+> criteria: publish a closed testing release, have at least **12 testers opted in**, and run
+> that test for at least **14 days**.
+
+**This applies per app.** `ahcplayer` is a separate listing on the same account, so it needs its
+own closed test with its own 12 testers for its own 14 days — the AiHomeCloud app's progress
+does not carry over.
+
+That also means **open testing is unavailable for this app** until its production access is
+granted, exactly as on the phone app.
+
+## Revised order of operations
+
+1. Set a deliberate `versionCode` / `versionName` (still 1 / "1.0").
+2. Capture TV screenshots free of personal media.
+3. Complete App content: privacy policy, data safety, content rating, target audience.
+4. Create the listing and publish to **internal testing** — unrestricted, immediate.
+5. Publish a **closed test** and recruit **12 testers who actually opt in**.
+6. Wait **14 continuous days** with those 12 opted in.
+7. Apply for production access.
+8. Only then are open testing and production reachable.
+
+The engineering work is finished and verified on real hardware. **What remains is a recruitment
+and waiting problem**, and the 14-day clock cannot start until the twelfth tester opts in.
+
+Worth deciding deliberately: whether this app needs a public listing at all in the near term, or
+whether internal testing plus sideloading to the household Fire TV is sufficient for now. The
+latter is available immediately and costs nothing.
