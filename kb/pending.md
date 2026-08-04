@@ -33,13 +33,17 @@
 
 ## Open bugs (2026-08-03)
 ### Found on Fire TV AFTMM (now at 192.168.0.62:5555, was .214), API 25
-- [ ] **Host/IP field unreachable by D-pad on Add SMB Source.** Once focus reaches
+- [x] **Host/IP field unreachable by D-pad on Add SMB Source.** FIXED and verified on
+  the AFTMM 2026-08-04: UP from Share now lands on Host with a visible focus ring.
+  Root cause was OutlinedTextField consuming DPAD up/down as cursor movement even when
+  readOnly, so focusProperties never ran; fixed with onPreviewKeyEvent. Original note: Once focus reaches
   the Share field, UP does not move to Host. Verified with `uiautomator dump`:
   Host is `focusable=true focused=false` while Share holds focus, and focus is
   unchanged after an isolated UP press — so it is a traversal failure, not an
   unfocusable field. This blocks adding an SMB source on TV. Needs explicit
   `focusProperties { up = ... }` wiring in `AhcTextField` / SetupScreen.
-- [ ] **RIGHT does not cross from the left column to the right panel** on the
+- [x] **RIGHT crosses columns** — verified on the AFTMM: a single RIGHT from the left
+  column reaches "Add SMB Source". Original note: on the
   Add Source screen; "Add SMB Source" is only reachable via DOWN-then-RIGHT.
 - [ ] **Nothing has focus on entering the SMB form** — Compose does not auto-focus;
   needs `FocusRequester` + `LaunchedEffect` per TV screen.
@@ -68,19 +72,31 @@
   and a host with `hasAhc = true` was previously reachable via the Discover screen's
   AHC path (-> ProfileSelect). Tapping its card on Home now sends it to the SMB form
   instead. Should branch on `hasAhc` and route AHC hosts to the profile flow.
-- [ ] **D-pad fixes are compile-verified only** — needs a Fire TV pass on
+- [x] **D-pad fixes verified on hardware** (AFTMM, API 25, 2026-08-04). Remaining gap:
+  Home screen still opens with nothing focused — that screen was scoped out of the fix.
+  Original note: — needs a Fire TV pass on
   Name/Host/Share/Connect traversal both directions, and RIGHT from a device card
   into "Add SMB Source".
-- [ ] **v7 -> v8 upgrade never run on a populated device database.** Verified by SQL
+- [x] **v7 -> v8 upgrade confirmed in place on device** (user_version 8, all three new
+  tables, existing rows intact). Original note: Verified by SQL
   execution and by matching Room's generated expectations, but not in place on hardware.
-- [ ] **Server thumbnails are wired but not consumed.** `AhcImageLoaders` +
+- [x] **Server thumbnails consumed.** Original note: `AhcImageLoaders` +
   `ahcThumbnailUrl` + `AhcRepository.imageClientFor` exist; the browse layer does not
   yet request them, so posters remain letter tiles. This is the replacement for TMDB.
-- [ ] **Profile picker ignores the tapped profile.** Selecting any profile on the
+- [x] **Profile picker fixed** — it was a 3s dwell auto-select, not tap handling;
+  now gated to leanback devices. Original note: Selecting any profile on the
   "Who's Watching?" home layout lands on the PIN screen for `Paras` (the last-used /
   focus-ringed one). Reproduced repeatedly on the tablet with taps at different
   coordinates and via D-pad. Blocks reaching a browse screen at all, and blocked
   verification of thumbnail rendering.
-- [ ] **Thumbnail rendering unverified in-app.** Server endpoint proven (200,
+- [x] **Thumbnails render** — verified on the tablet: real extracted frames on poster
+  cards and a blurred backdrop on the hero. Original note: Server endpoint proven (200,
   image/jpeg) and the Coil wiring compiles, but no screenshot of a rendered poster
   yet — gated on the profile-picker bug above.
+
+- [ ] **Home screen opens with no focus on TV** — the initial-focus fix covered Setup and
+  Discover only. On the AFTMM, Home starts with nothing focused; the first DOWN then lands
+  on an unlabelled element. Needs a FocusRequester target per Home layout (there are two).
+- [ ] **Focus targets are unlabelled for accessibility.** `uiautomator` reports bare `View`
+  for every focusable on Home, so focus cannot be traced by tooling and a screen reader
+  would announce nothing. Needs contentDescription on the focusable wrappers.
