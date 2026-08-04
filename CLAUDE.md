@@ -39,7 +39,7 @@ Physical devices are shared, real hardware — treat them accordingly.
 | Device | Address | Notes |
 |---|---|---|
 | Lenovo tablet TB311FU | `HNQ018GD` (USB) | no PIN, USB debugging on — primary test device |
-| Fire TV AFTMM | `192.168.0.214:5555` | API 25, D-pad reference device |
+| Fire TV AFTMM | `192.168.0.62:5555` | API 25 (Android 7.1.2, `mantis`), D-pad reference device. Address corrected 2026-08-05 — `.214` was documented but `.62` is what answers; DHCP presumably moved it, so re-check with `adb devices` rather than trusting either number. |
 
 **Open:** `adb devices` → confirm target → `input keyevent 224` (WAKEUP, explicit;
 never rely on `26` which toggles).
