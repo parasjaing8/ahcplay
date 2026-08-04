@@ -46,3 +46,11 @@ verified on the real Fire TV and an Android TV emulator, override survives resta
 AiHomeCloud client is now checked against a vendored copy of the backend contract
 (`scripts/check_ahc_contract.py`); all 5 endpoints measured correct before the check was added,
 so this prevents drift rather than fixing it. Module's first unit tests (6) also landed.
+
+## 2026-08-05 (later)
+Phase 3 milestones 3, 4 and 6 complete; 5 prepared but not submitted. The admin audit found and
+removed an administrative pairing path that was reachable but non-functional, fixed a silently
+dead discovery sweep, and surfaced a backend device-name bug now deployed to all three boards.
+Full playback path verified on the real Fire TV including seek and resume. Play submission needs
+Paras: versionCode is still 1, TV screenshots do not exist, and the data-safety/privacy/content
+attestations are his to make.

@@ -212,3 +212,36 @@ disagree. Both failure modes confirmed by injection, then confirmed clean after 
 Also: Fire TV address in CLAUDE.md was `.214`; `.62` is what answers.
 
 Devices: Fire TV woken only for the install check, returned to `Asleep`. TV emulator killed.
+
+## 2026-08-05 (later) — Phase 3 milestones 3, 4, 5, 6
+
+**M3 — admin-surface audit: two findings, both fixed.** A screen inventory would have passed
+this app and been wrong; both findings were in the data layer. Audited by capability instead.
+
+1. `autopair()` fetched `/api/v1/pair/qr` and paired with the key inside — the server's own
+   docstring calls that enough for "a full unconditional-admin pairing". I first logged it as
+   dead code; **the compiler proved me wrong** — `getOrFetchToken` fell back to it whenever no
+   profile was chosen, and my grep had excluded the file the caller lived in. It had never
+   *worked* (endpoint is loopback-only, 403s the LAN), so it survived by the server's guard, not
+   by design. Removed with its 3 DTOs; that branch now states the real constraint.
+2. `probeHost` used the same endpoint → Discover's sweep got 403 for every address and silently
+   found nothing, hidden because HomeScreen's port-scan discovery works. Now on `/api/health`.
+3. Backend bug found from here: `/api/health` and `/` returned the install-time default name
+   while `/system/info` returned the renamed one. Fixed in aihomecloud, deployed to all 3 boards.
+
+**M4 — dogfooded on the real Fire TV Stick 4K (API 25).** Full path: discover → profile →
+browse 3 levels → play → seek → exit → resume. libVLC decoded 1920x1088, audio out of standby,
+both seeks landed (PTS 34.6→43.2, 46.4→56.1), resume returned at 82.6s not 0.
+
+**M6 — `docs/PLATFORM_SUPPORT.md`.** Vega non-support stated with evidence
+(`ro.com.amazon.vega` empty → household stick is pre-Vega and keeps working).
+
+**M5 — prepared, NOT submitted** (`docs/PLAY_TV_SUBMISSION_PREP.md`). All manifest requirements
+verified including banner at exactly 320x180. Blocking: `versionCode` still 1, no TV screenshots,
+and the data-safety/privacy/content-rating attestations are Paras's to make.
+
+**Also:** this file's close-out protocol said `keyevent 26` to blank the screen while warning two
+lines above never to trust 26 for waking. It toggles both ways — it woke the Fire TV after a
+finished test run. Now `223` (SLEEP).
+
+Devices: Fire TV `Asleep`, tablet `Dozing`, no emulators.
