@@ -40,9 +40,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.aihomecloud.ahcplayer.ui.platform.TvOverride
+import com.aihomecloud.ahcplayer.ui.platform.isTelevision
 
 private enum class SettingsCategory(val label: String) {
     SOURCES("Sources"),
+    DISPLAY("Display"),
     DATA("Data"),
     ABOUT("About")
 }
@@ -66,6 +73,18 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val sources = db.sourceDao().getAll()
         .map { list -> list.map(::mapSource) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * The device-type override. Exposed as state so flipping it re-renders the pane
+     * immediately; the screens that read it pick it up on their next composition.
+     */
+    var tvOverride by mutableStateOf(prefs.tvOverride)
+        private set
+
+    fun applyTvOverride(value: TvOverride) {
+        tvOverride = value
+        prefs.tvOverride = value
+    }
 
     fun deleteSource(source: MediaSource) {
         viewModelScope.launch {
@@ -175,6 +194,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     when (selectedCategory) {
                         SettingsCategory.SOURCES -> SourcesPane(vm = vm, sources = sources)
+                        SettingsCategory.DISPLAY -> DisplayPane(vm = vm)
                         SettingsCategory.DATA -> DataPane(
                             onClearHistory = { showClearHistoryConfirm = true }
                         )
@@ -309,6 +329,51 @@ private fun SourcesPane(vm: SettingsViewModel, sources: List<MediaSource>) {
             onDismiss = { showUsbPicker = false }
         )
     }
+}
+
+@Composable
+private fun DisplayPane(vm: SettingsViewModel) {
+    val context = LocalContext.current
+    PaneHeader("Display")
+
+    val detected = remember { context.isTelevision(TvOverride.AUTO) }
+    Text(
+        "This device reports itself as ${if (detected) "a TV" else "not a TV"}.",
+        color = TextSecondary,
+        style = MaterialTheme.typography.bodyLarge,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "On a TV the highlighted profile opens by itself after a moment, because there is no " +
+            "touch. Change this only if that behaviour is wrong for this device.",
+        color = TextMuted,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Spacer(Modifier.height(16.dp))
+
+    TvOverride.entries.forEach { option ->
+        SettingsRow(
+            title = when (option) {
+                TvOverride.AUTO -> "Automatic"
+                TvOverride.FORCE_TV -> "Always treat as a TV"
+                TvOverride.FORCE_TOUCH -> "Never treat as a TV"
+            },
+            subtitle = when (option) {
+                TvOverride.AUTO -> "Trust what the device reports" +
+                    if (vm.tvOverride == option) " — currently ${if (detected) "TV" else "touch"}" else ""
+                TvOverride.FORCE_TV -> "Use D-pad behaviour and auto-select"
+                TvOverride.FORCE_TOUCH -> "Never auto-select a profile"
+            } + if (vm.tvOverride == option) "  ✓" else "",
+            onClick = { vm.applyTvOverride(option) },
+        )
+    }
+
+    Spacer(Modifier.height(12.dp))
+    Text(
+        "Takes effect when you return to the profile screen.",
+        color = TextMuted,
+        style = MaterialTheme.typography.bodySmall,
+    )
 }
 
 @Composable

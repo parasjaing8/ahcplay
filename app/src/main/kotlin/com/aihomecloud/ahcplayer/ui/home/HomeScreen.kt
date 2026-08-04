@@ -17,8 +17,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import android.content.pm.PackageManager
 import androidx.compose.runtime.*
+import com.aihomecloud.ahcplayer.data.prefs.AppPreferences
+import com.aihomecloud.ahcplayer.ui.platform.isTelevision
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -274,8 +275,10 @@ private fun ProfileRow(
     // all — it fires before the user has even reached for the screen, which is how it
     // ended up opening a PIN-protected profile nobody chose. Touch selects explicitly.
     val context = LocalContext.current
+    // Centralised so the auto-select timer and any future TV-only behaviour agree, and so a
+    // device that misreports itself can be corrected from Settings instead of by a new build.
     val isTv = remember {
-        context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        context.isTelevision(AppPreferences(context).tvOverride)
     }
 
     LaunchedEffect(selectedIndex, isTv) {
