@@ -129,3 +129,44 @@ Work was reprioritised around that.
 - No poster/backdrop art — TMDB key was stripped in the June audit, so the
   "Netflix look" is currently text-on-gradient. Needs a secret-handling decision.
 - Still stubbed: Bookmarks, Save Playlist, Play as audio, Control settings, Tips.
+
+## 2026-08-04 — autonomous block: TMDB removal, server artwork, D-pad verified
+
+Ran overnight with broad autonomy. Everything below was verified on real hardware.
+
+- **TMDB deleted** (`3a9938f`, -250 lines). Its terms bar commercial use without a written
+  agreement, which collides with the planned paid tier; the per-user API key was also the
+  real onboarding friction. `data/tmdb` -> `data/metadata`. `TitleParser` kept.
+- **Artwork replaced by server-side frame extraction** (`4f550df`, `9a7c2a3`). The backend
+  already had ffmpeg thumbnails cached by path+mtime — nothing new was needed server-side.
+  Coil loaders are per host (TOFU pins are per device); the token attaches only when host
+  *and* port match.
+  - Bug found on device: `serverThumbnailFor` required an `ahc://` URI, but only
+    *directories* get those — files get `smb://` so libVLC can stream them. The check
+    rejected exactly the items that can have artwork.
+- **AHC browse was 403 end to end** (`353311a`). `listFiles` treated 403 as a stale token and
+  discarded a valid credential; and the client listed the NAS root, which the backend
+  deliberately refuses for non-admins (guard added 2026-07-30 after a review found a
+  non-admin could reach every member's private files via a whole-tree delete). Guard left
+  alone; client now probes visible scopes. Verified live: Prutha sees entertainment+family,
+  personal correctly hidden.
+- **Profile picker self-navigated** (`9a7c2a3`) — a 3s dwell auto-select. Right for a remote,
+  wrong on touch, where it fired before the user could act. Gated to `FEATURE_LEANBACK`.
+- **Fire TV pass** (`2b5264a`, `bbeff95`, a11y commit). Host/IP now reachable by D-pad — root
+  cause was `OutlinedTextField` consuming DPAD up/down even when `readOnly`, so
+  `focusProperties` never ran; fixed with `onPreviewKeyEvent`. RIGHT crosses columns. Home
+  claims initial focus and its cards are labelled (they reported as bare `View`, so neither
+  tooling nor a screen reader could identify them).
+- **Bookmarks + Save Playlist** (`183e744`), Room v7->v8 with a real migration —
+  **confirmed applied in place on the device**, existing rows intact.
+- **GitHub Actions storage** was at 90% of quota: 2.8GB of stale `app-debug` artifacts from a
+  workflow that no longer exists. Deleted; account now at 3.5MB. No workflow to fix.
+
+**Two agents ran in parallel worktrees** (D-pad/prefill, and bookmarks/playlists). Both
+delivered good work. Trap: they were told not to commit, so `git merge <branch>` brought
+nothing — their changes sat uncommitted in the worktree and had to be applied as patches.
+
+**Not done, and why:** Phase 0 of the execution plan is still entirely unstarted. This block
+was `ahcplay` bug-fixing, which the architecture decision treats as a code donor rather than
+a shipping app. Phase 0 is gated on the telemetry landing in a daily-use build — a decision
+for Paras, not something to take autonomously.
