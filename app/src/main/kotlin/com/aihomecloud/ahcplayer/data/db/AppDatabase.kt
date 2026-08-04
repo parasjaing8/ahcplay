@@ -6,7 +6,6 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.aihomecloud.ahcplayer.BuildConfig
 
 @Database(
     entities = [
@@ -74,7 +73,11 @@ abstract class AppDatabase : RoomDatabase() {
                 "ahcplayer.db"
             )
                 .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
-                .apply { if (BuildConfig.DEBUG) fallbackToDestructiveMigration() }
+                // No destructive fallback, not even on debug. It used to wipe the database
+                // when a migration was missing or wrong, which meant the defect never failed
+                // anywhere a developer would notice — and then reached release, where there
+                // is no fallback and the crash is real. Failing here costs a reinstall and
+                // surfaces the bug while it is still cheap.
                 .build().also { INSTANCE = it }
         }
     }
