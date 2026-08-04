@@ -94,9 +94,9 @@
   image/jpeg) and the Coil wiring compiles, but no screenshot of a rendered poster
   yet — gated on the profile-picker bug above.
 
-- [ ] **Home screen opens with no focus on TV** — the initial-focus fix covered Setup and
+- [x] **Home initial focus** — FIXED, verified on the AFTMM. Original note: — the initial-focus fix covered Setup and
   Discover only. On the AFTMM, Home starts with nothing focused; the first DOWN then lands
   on an unlabelled element. Needs a FocusRequester target per Home layout (there are two).
-- [ ] **Focus targets are unlabelled for accessibility.** `uiautomator` reports bare `View`
+- [x] **Focusables labelled** — Resume/source/add-source cards now carry contentDescription. Original note: `uiautomator` reports bare `View`
   for every focusable on Home, so focus cannot be traced by tooling and a screen reader
   would announce nothing. Needs contentDescription on the focusable wrappers.
