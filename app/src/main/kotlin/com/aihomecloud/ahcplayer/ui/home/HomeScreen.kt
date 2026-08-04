@@ -407,6 +407,12 @@ private fun ClassicHomeLayout(
     onResume: (WatchHistory) -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize().background(BgPrimary)) {
+        // Compose focuses nothing by default, which on a remote means the first press
+        // goes somewhere unpredictable. Claim a sensible target once, and never fight
+        // the user for focus afterwards.
+        val firstTile = remember { FocusRequester() }
+        LaunchedEffect(Unit) { runCatching { firstTile.requestFocus() } }
+
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
         ) {
@@ -431,10 +437,17 @@ private fun ClassicHomeLayout(
                     onAdd = { host -> onAddDiscoveredHost(host) }
                 )
                 SectionRow(title = "My Sources") {
-                    sources.forEach { src ->
-                        SourceCard(source = src, onClick = { onBrowseSource(src) })
+                    sources.forEachIndexed { index, src ->
+                        SourceCard(
+                            source = src,
+                            onClick = { onBrowseSource(src) },
+                            modifier = if (index == 0) Modifier.focusRequester(firstTile) else Modifier
+                        )
                     }
-                    AddSourceCard(onClick = onAddSource)
+                    AddSourceCard(
+                        onClick = onAddSource,
+                        modifier = if (sources.isEmpty()) Modifier.focusRequester(firstTile) else Modifier
+                    )
                 }
             }
         }
@@ -503,6 +516,7 @@ private fun ResumeCard(item: WatchHistory, onClick: () -> Unit) {
             .then(if (focused) Modifier.border(Dimens.focusBorder, Accent, RoundedCornerShape(8.dp)) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .clickable { onClick() }
+            .semantics { contentDescription = "Resume ${item.title}" }
             .padding(bottom = 8.dp)
     ) {
         Box(
@@ -529,10 +543,10 @@ private fun ResumeCard(item: WatchHistory, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SourceCard(source: MediaSource, onClick: () -> Unit) {
+private fun SourceCard(source: MediaSource, onClick: () -> Unit, modifier: Modifier = Modifier) {
     var focused by remember { mutableStateOf(false) }
     Box(
-        modifier = Modifier
+        modifier = modifier
             .width(Dimens.cardWidth)
             .height(Dimens.cardHeight * 0.5f)
             .clip(RoundedCornerShape(8.dp))
@@ -543,6 +557,7 @@ private fun SourceCard(source: MediaSource, onClick: () -> Unit) {
             .then(if (focused) Modifier.border(Dimens.focusBorder, Accent, RoundedCornerShape(8.dp)) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .clickable { onClick() }
+            .semantics { contentDescription = "Open source ${source.name}" }
             .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -557,10 +572,10 @@ private fun SourceCard(source: MediaSource, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AddSourceCard(onClick: () -> Unit) {
+private fun AddSourceCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
     var focused by remember { mutableStateOf(false) }
     Box(
-        modifier = Modifier
+        modifier = modifier
             .width(Dimens.cardWidth)
             .height(Dimens.cardHeight * 0.5f)
             .clip(RoundedCornerShape(8.dp))
@@ -568,6 +583,7 @@ private fun AddSourceCard(onClick: () -> Unit) {
             .border(2.dp, if (focused) Accent else TextMuted.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
             .onFocusChanged { focused = it.isFocused }
             .clickable { onClick() }
+            .semantics { contentDescription = "Add a source" }
             .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {
