@@ -46,7 +46,7 @@ never rely on `26` which toggles).
 
 **Close out — every session, without exception:**
 1. `adb shell am force-stop <pkg>`
-2. `adb shell input keyevent 26` (blank screen)
+2. `adb shell input keyevent 223` (KEYCODE_SLEEP — explicit, like 224 for wake). **Not 26**: `26` is POWER and toggles, so on an already-awake device it is a coin flip whether you blank it or wake it. Verified 2026-08-05 — `26` woke the Fire TV after a test run that had just stopped the app.
 3. `adb shell dumpsys power | grep mWakefulness=` → must read `Asleep`/`Dozing`
 4. `ps -A | grep <pkg>` → nothing left running
 
