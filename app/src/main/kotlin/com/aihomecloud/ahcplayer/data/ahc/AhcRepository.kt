@@ -53,27 +53,41 @@ class AhcRepository(context: Context) {
         return buildAhcRetrofit("https://$host:$port/", client)
     }
 
-    // Auto-pair at device level (no profile)
-    suspend fun ensureToken(host: String, port: Int, username: String = ""): String {
-        val existing = getToken(host, username)
-        if (!existing.isNullOrEmpty()) return existing
-        return autopair(host, port, username)
-    }
+    // Device-level auto-pairing used to live here (`ensureToken` / `autopair`). It fetched
+    // /api/v1/pair/qr and paired with the key inside it — which the server's own docstring
+    // describes as enough for "a full unconditional-admin pairing". That is an administrative
+    // capability, and this app is consumption-only by design.
+    //
+    // It was reachable: `getOrFetchToken` fell back to it whenever no profile was chosen. It
+    // simply never worked, because the server serves that endpoint to loopback only and 403s
+    // the LAN — so the fallback produced an opaque HTTP error rather than a token, and the
+    // administrative intent was never exercised. Removed 2026-08-05; that branch now says what
+    // is actually wrong. Profile login (`loginWithProfile`) is the only way this app gets a
+    // token, which is what "consumption-only" has to mean in code and not just in a document.
 
-    private suspend fun autopair(host: String, port: Int, username: String): String {
-        val api = apiFor(host, port)
-        val qr = api.getPairingInfo()
-        val tokenResp = api.pair(AhcPairRequest(qr.serial, qr.key))
-        saveToken(host, username, tokenResp.token)
-        return tokenResp.token
-    }
-
-    // Used by DiscoverViewModel to probe a single IP
+    /**
+     * Identify a single address, for DiscoverViewModel's subnet sweep.
+     *
+     * Uses `/api/health`, which is unauthenticated and returns the device's serial and its
+     * user-set name. This previously called `/api/v1/pair/qr` — an administrative,
+     * loopback-only endpoint — so over the LAN it received 403 and returned null for every
+     * address. The Discover screen's sweep therefore found nothing at all, silently, while the
+     * home screen's port-scan discovery worked fine and hid the fault.
+     *
+     * The name also improves: health reports what the user actually called the device, rather
+     * than a serial reformatted into something that looks like a name.
+     */
     suspend fun probeHost(host: String, port: Int = 8443): AhcDeviceInfo? {
         return try {
             val api = apiFor(host, port, connectTimeoutMs = 1500L, readTimeoutMs = 2000L)
-            val qr = api.getPairingInfo()
-            AhcDeviceInfo(host = host, port = port, serial = qr.serial, displayName = serialToDisplayName(qr.serial))
+            val health = api.getHealth()
+            if (health.status != "ok") return null
+            AhcDeviceInfo(
+                host = host,
+                port = port,
+                serial = health.serial,
+                displayName = health.deviceName.ifBlank { serialToDisplayName(health.serial) },
+            )
         } catch (e: Exception) { null }
     }
 
@@ -172,7 +186,15 @@ class AhcRepository(context: Context) {
                 throw e
             }
         } else {
-            ensureToken(host, port, "")
+            // No profile chosen. This used to fall back to device-level auto-pairing, which
+            // asked the server for an administrative pairing key — and got 403, because that
+            // endpoint is loopback-only. So this branch has never actually produced a token;
+            // it produced an opaque HTTP error. Say what is wrong instead. Every real path
+            // into browsing goes through profile selection first, so reaching here means a
+            // caller skipped it.
+            throw IllegalStateException(
+                "Choose a profile before browsing this device — AiHomeCloud issues access per profile."
+            )
         }
     }
 

@@ -6,19 +6,17 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
 
-data class AhcPairQrResponse(
-    val serial: String,
-    val ip: String,
-    val otp: String,
-    val expiresAt: Long,
-    @SerializedName("qrValue") val qrValue: String = ""
-) {
-    // key is embedded in qrValue: "aihomecloud://pair?serial=...&key=KEY&..."
-    val key: String get() = qrValue.substringAfter("key=").substringBefore("&")
-}
+// The pairing DTOs (AhcPairQrResponse / AhcPairRequest / AhcTokenResponse) lived here until
+// 2026-08-05. They served the device-level auto-pairing path removed from AhcRepository — an
+// administrative capability that does not belong in a consumption-only app. Removed rather than
+// kept "in case", so nothing can quietly wire them back up.
 
-data class AhcPairRequest(val serial: String, val key: String)
-data class AhcTokenResponse(val token: String)
+/** `GET /api/health` — unauthenticated, and the only device identity this app needs. */
+data class AhcHealthResponse(
+    val status: String,
+    val serial: String,
+    val deviceName: String = ""
+)
 
 data class AhcFileItem(
     val name: String,
@@ -56,11 +54,10 @@ data class AhcDeviceInfo(
 )
 
 interface AhcApiService {
-    @GET("api/v1/pair/qr")
-    suspend fun getPairingInfo(): AhcPairQrResponse
-
-    @POST("api/v1/pair")
-    suspend fun pair(@Body body: AhcPairRequest): AhcTokenResponse
+    // Identity probe. Unauthenticated by design on the server, and deliberately NOT
+    // /api/v1/pair/qr — that one is administrative and loopback-only. See AhcRepository.
+    @GET("api/health")
+    suspend fun getHealth(): AhcHealthResponse
 
     @GET("api/v1/files/list")
     suspend fun listFiles(
