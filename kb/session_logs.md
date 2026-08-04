@@ -170,3 +170,45 @@ nothing — their changes sat uncommitted in the worktree and had to be applied 
 was `ahcplay` bug-fixing, which the architecture decision treats as a code donor rather than
 a shipping app. Phase 0 is gated on the telemetry landing in a daily-use build — a decision
 for Paras, not something to take autonomously.
+
+## 2026-08-05 — Phase 3 milestones 1 & 2
+
+**Milestone 1 — TV detection centralised, with a user override** (`77b2fdd`)
+
+Detection was a local `remember` in HomeScreen: `FEATURE_LEANBACK` only, no secondary signal,
+no override. It gates a timer that auto-opens the highlighted profile — the comment above it
+already records that firing on a PIN-protected profile nobody chose. A handheld misreporting
+leanback reproduces exactly that, previously fixable only by shipping a new build.
+
+- `ui/platform/DeviceType.kt` — pure `resolveIsTv(hasLeanback, isTelevisionUiMode, override)`
+- `TvOverride` AUTO / FORCE_TV / FORCE_TOUCH, persisted in `AppPreferences`
+- Settings > **Display** pane, new category
+- `WindowSizeClass` confirmed absent; the reason is now a code comment, not just plan text
+- **First tests in this module**: 6, plus the junit dependency
+
+Verified: 6/6 unit tests · real Fire TV reports `leanback`+`leanback_only`+`type.television`
+so AUTO resolves TV · Android TV emulator renders the pane and the override **survived a full
+process restart**.
+
+**Milestone 2 — contract check instead of generated DTOs** (`e6c4fe4`)
+
+Milestone said "migrate onto the generated typed client". Wrong shape here: the backend's
+generator emits models to a scratch dir for hand-copying, and this is a *different repo*, so
+copied DTOs would look generated while being an unenforced duplicate. What protected the phone
+app was the CI drift check, not generated code.
+
+Measured first: **all 5 endpoints already correct** — response shapes and all 5 `/files/list`
+query params match. No drift to fix, only drift to prevent.
+
+- `contracts/openapi.json` vendored from `aihomecloud@7375cf9`, provenance in `contracts/README.md`
+- `scripts/check_ahc_contract.py` — fails on a client field the server never sends, and on a
+  query param the server does not accept (FastAPI discards unknowns silently)
+
+**The checker's first version said "clean" after inspecting 2 of 5 declarations** — the regex
+excluded anything with a parameter annotation. Same failure class the tool exists to catch, so
+it now compares declarations-found against declarations-checked and refuses a verdict when they
+disagree. Both failure modes confirmed by injection, then confirmed clean after revert.
+
+Also: Fire TV address in CLAUDE.md was `.214`; `.62` is what answers.
+
+Devices: Fire TV woken only for the install check, returned to `Asleep`. TV emulator killed.

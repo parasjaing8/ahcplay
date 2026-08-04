@@ -39,3 +39,10 @@
 - Optional: finish BrowseScreen split, full a11y pass, e2e D-pad walkthrough of new
   internal/USB source flow on Fire TV (in progress).
 
+## 2026-08-05
+Phase 3 milestones 1 and 2 done. TV detection is centralised in `ui/platform/DeviceType.kt` as
+a pure function with a persisted Automatic/Always/Never override at Settings > Display —
+verified on the real Fire TV and an Android TV emulator, override survives restart. The app's
+AiHomeCloud client is now checked against a vendored copy of the backend contract
+(`scripts/check_ahc_contract.py`); all 5 endpoints measured correct before the check was added,
+so this prevents drift rather than fixing it. Module's first unit tests (6) also landed.
