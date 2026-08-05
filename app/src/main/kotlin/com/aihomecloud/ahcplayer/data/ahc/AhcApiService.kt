@@ -40,6 +40,25 @@ data class AhcUserProfile(
 )
 
 data class AhcProfilesResponse(val users: List<AhcUserProfile>)
+
+/** `GET /api/v1/files/search/semantic` — meaning-based search across the whole library. */
+data class AhcSemanticHit(
+    val path: String,
+    val filename: String,
+    val score: Float = 0f,
+)
+
+data class AhcSemanticResponse(
+    val results: List<AhcSemanticHit> = emptyList(),
+    val query: String = "",
+    val count: Int = 0,
+)
+
+/** Whether this server offers it at all — false on any server without the embedding runtime. */
+data class AhcSemanticStatus(
+    val available: Boolean = false,
+    val indexedCount: Int = 0,
+)
 data class AhcLoginRequest(val name: String, val pin: String = "")
 data class AhcLoginResponse(
     @SerializedName("accessToken") val accessToken: String,
@@ -72,6 +91,18 @@ interface AhcApiService {
     // GET /api/v1/auth/users/names — list family profiles, no auth required
     @GET("api/v1/auth/users/names")
     suspend fun getProfiles(): AhcProfilesResponse
+
+    // GET /api/v1/files/search/semantic — searches the WHOLE library by meaning, unlike the
+    // local substring filter which only sees the folder currently open.
+    @GET("api/v1/files/search/semantic")
+    suspend fun searchSemantic(
+        @Header("Authorization") bearer: String,
+        @Query("q") query: String,
+        @Query("limit") limit: Int = 30,
+    ): AhcSemanticResponse
+
+    @GET("api/v1/files/search/semantic/status")
+    suspend fun semanticStatus(@Header("Authorization") bearer: String): AhcSemanticStatus
 
     // POST /api/v1/auth/login — profile-level auth; returns {accessToken, refreshToken}
     @POST("api/v1/auth/login")

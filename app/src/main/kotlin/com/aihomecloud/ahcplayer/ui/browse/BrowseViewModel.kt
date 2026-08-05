@@ -21,6 +21,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import android.net.Uri
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 sealed class BrowseState {
     object Idle : BrowseState()
@@ -75,18 +80,79 @@ class BrowseViewModel(app: Application) : AndroidViewModel(app) {
     fun setSearchQuery(q: String) {
         _searchQuery.value = q
         applyFilter()
+        // The local filter only ever sees the folder currently open. Semantic search sees the
+        // whole library, which is what someone with a remote control actually wants — typing a
+        // filename on a D-pad is the slowest thing a person can do on a TV.
+        scheduleSemanticSearch(q)
     }
 
     private fun applyFilter() {
         val q = _searchQuery.value.trim().lowercase()
-        val filtered = if (q.isEmpty()) allItems
+        val local = if (q.isEmpty()) allItems
         else allItems.filter { it.name.lowercase().contains(q) }
-        _state.value = BrowseState.Success(filtered)
+        // Substring hits in this folder are exact and stay first; library-wide matches extend
+        // the tail, deduplicated by URI.
+        val combined = if (q.isEmpty()) local else {
+            val seen = local.mapTo(mutableSetOf()) { it.uri }
+            local + _semanticHits.value.filter { it.uri !in seen }
+        }
+        _state.value = BrowseState.Success(combined)
+    }
+
+    private val _semanticHits = MutableStateFlow<List<BrowseItem>>(emptyList())
+    val semanticHitCount: StateFlow<Int> =
+        _semanticHits.map { it.size }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    private var semanticJob: Job? = null
+    private var semanticAvailable: Boolean? = null
+
+    /**
+     * Debounced, because on a D-pad every character arrives as its own keystroke and each one
+     * would otherwise cost a round trip plus an inference on the board.
+     */
+    private fun scheduleSemanticSearch(query: String) {
+        semanticJob?.cancel()
+        val q = query.trim()
+        if (q.length < 3) {
+            _semanticHits.value = emptyList()
+            applyFilterOnly()
+            return
+        }
+        semanticJob = viewModelScope.launch {
+            delay(450)
+            val root = runCatching { Uri.parse(_currentUri.value) }.getOrNull() ?: return@launch
+            if (root.scheme != "ahc") return@launch          // SMB sources have no server to ask
+            val host = root.host ?: return@launch
+            val port = root.port.takeIf { it > 0 } ?: AHC_DEFAULT_PORT
+            val user = root.getQueryParameter("user").orEmpty()
+
+            if (semanticAvailable == null) {
+                semanticAvailable = ahcRepo.semanticAvailable(host, port, user)
+            }
+            if (semanticAvailable != true) return@launch
+
+            val share = root.getQueryParameter("share").orEmpty()
+            _semanticHits.value = ahcRepo.searchSemantic(host, port, user, q, share)
+            applyFilterOnly()
+        }
+    }
+
+    private fun applyFilterOnly() {
+        val q = _searchQuery.value.trim().lowercase()
+        val local = if (q.isEmpty()) allItems
+        else allItems.filter { it.name.lowercase().contains(q) }
+        val combined = if (q.isEmpty()) local else {
+            val seen = local.mapTo(mutableSetOf()) { it.uri }
+            local + _semanticHits.value.filter { it.uri !in seen }
+        }
+        _state.value = BrowseState.Success(combined)
     }
 
     fun browse(uri: String) {
         _currentUri.value = uri
         _searchQuery.value = ""
+        semanticJob?.cancel()
+        _semanticHits.value = emptyList()
         viewModelScope.launch {
             _state.value = BrowseState.Loading
             try {

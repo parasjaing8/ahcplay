@@ -72,6 +72,7 @@ fun BrowseScreen(
     val currentUri by vm.currentUri.collectAsStateWithLifecycle()
     val metadataMap by vm.metadata.collectAsStateWithLifecycle()
     val searchQuery by vm.searchQuery.collectAsStateWithLifecycle()
+    val semanticHitCount by vm.semanticHitCount.collectAsStateWithLifecycle()
     val continueWatching by vm.continueWatching.collectAsStateWithLifecycle()
     var searchActive by remember { mutableStateOf(false) }
     var selectedUri by remember(currentUri) { mutableStateOf<String?>(null) }
@@ -175,6 +176,8 @@ fun BrowseScreen(
             searchQuery = searchQuery,
             searchFocusRequester = searchFocusRequester,
             onSearchChanged = vm::setSearchQuery,
+            // Results from outside this folder need explaining, or they read as a bug.
+            semanticHitCount = semanticHitCount,
             onSearchOpen = { searchActive = true },
             onBack = ::navigateBack,
             modifier = Modifier
@@ -352,6 +355,7 @@ private fun BrowseTopBar(
     searchQuery: String,
     searchFocusRequester: FocusRequester,
     onSearchChanged: (String) -> Unit,
+    semanticHitCount: Int = 0,
     onSearchOpen: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -376,6 +380,16 @@ private fun BrowseTopBar(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
+        if (searchActive && semanticHitCount > 0) {
+            // Library-wide matches are not in the folder on screen, so without this they look
+            // like files that appeared from nowhere.
+            Text(
+                "+$semanticHitCount from your library",
+                style = MaterialTheme.typography.labelLarge,
+                color = Accent,
+                maxLines = 1,
+            )
+        }
         if (searchActive) {
             OutlinedTextField(
                 value = searchQuery,

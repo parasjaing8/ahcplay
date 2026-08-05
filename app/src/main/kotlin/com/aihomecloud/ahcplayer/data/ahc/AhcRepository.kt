@@ -110,6 +110,44 @@ class AhcRepository(context: Context) {
         return resp.accessToken
     }
 
+    /**
+     * Whether this device offers meaning-based search.
+     *
+     * Any failure means no — an older server 404s the endpoint and one without the embedding
+     * runtime answers false, and both mean the same thing to a TV: do not offer it.
+     */
+    suspend fun semanticAvailable(host: String, port: Int, username: String): Boolean = try {
+        val token = getToken(host, username) ?: return false
+        apiFor(host, port).semanticStatus("Bearer $token").available
+    } catch (e: Exception) {
+        false
+    }
+
+    /**
+     * Meaning-based search over the whole library.
+     *
+     * The TV's existing search filters the folder currently open, by substring. This is the one
+     * that can answer "kids at the beach" from the top level — which matters far more on a
+     * remote control, where typing a filename is the slowest thing a person can do.
+     */
+    suspend fun searchSemantic(
+        host: String, port: Int, username: String, query: String, smbShare: String = "",
+    ): List<BrowseItem> = try {
+        val token = getToken(host, username) ?: return emptyList()
+        val userParam = if (username.isNotEmpty()) "&user=$username" else ""
+        apiFor(host, port).searchSemantic("Bearer $token", query).results.map { hit ->
+            // isVideo is derived from the name, not passed — the extension is the truth.
+            BrowseItem(
+                name = hit.filename,
+                uri = "ahc://$host:$port${hit.path}?share=$smbShare$userParam",
+                isDirectory = false,
+            )
+        }
+    } catch (e: Exception) {
+        Log.w(TAG, "semantic search failed: ${e.message}")
+        emptyList()
+    }
+
     suspend fun listFiles(
         host: String,
         port: Int,
