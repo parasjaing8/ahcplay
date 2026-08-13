@@ -64,7 +64,7 @@ import kotlinx.coroutines.delay
 fun BrowseScreen(
     rootUri: String,
     sourceId: Long = 0L,
-    onPlayVideo: (uri: String, title: String, sourceId: Long) -> Unit,
+    onPlayVideo: (uri: String, title: String, sourceId: Long, entryId: Int?) -> Unit,
     onBack: () -> Unit,
     vm: BrowseViewModel = viewModel()
 ) {
@@ -153,10 +153,10 @@ fun BrowseScreen(
                         onPlay = { item ->
                             val title = metadataMap[item.name]?.displayTitle
                                 ?: item.name.substringBeforeLast('.')
-                            onPlayVideo(item.uri, title, sourceId)
+                            onPlayVideo(item.uri, title, sourceId, item.entryId)
                         },
                         onOpenFolder = { vm.push(it.uri) },
-                        onResume = { onPlayVideo(it.uri, it.title, it.sourceId) },
+                        onResume = { onPlayVideo(it.uri, it.title, it.sourceId, it.entryId) },
                         onDetails = { detailsItem = it }
                     )
                     else -> LibraryWithoutHero(
@@ -164,7 +164,7 @@ fun BrowseScreen(
                         otherItems = otherItems,
                         continueWatching = if (!vm.canGoBack) continueWatching else emptyList(),
                         onOpen = { vm.push(it.uri) },
-                        onResume = { onPlayVideo(it.uri, it.title, it.sourceId) }
+                        onResume = { onPlayVideo(it.uri, it.title, it.sourceId, it.entryId) }
                     )
                 }
             }
@@ -193,7 +193,7 @@ fun BrowseScreen(
                 onPlay = {
                     detailsItem = null
                     val title = metadata?.displayTitle ?: item.name.substringBeforeLast('.')
-                    onPlayVideo(item.uri, title, sourceId)
+                    onPlayVideo(item.uri, title, sourceId, item.entryId)
                 },
                 onDismiss = {
                     detailsItem = null

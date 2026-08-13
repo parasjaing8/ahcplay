@@ -30,7 +30,8 @@ data class BrowseItem(
     val uri: String,
     val isDirectory: Boolean,
     val sizeBytes: Long = 0,
-    val mimeType: String = ""
+    val mimeType: String = "",
+    val entryId: Int? = null
 ) {
     val isVideo: Boolean get() {
         if (isDirectory) return false
@@ -53,6 +54,7 @@ data class WatchHistory(
     val positionMs: Long,
     val durationMs: Long,
     val sourceId: Long,
+    val entryId: Int? = null,
     val lastWatchedAt: Long = System.currentTimeMillis()
 ) {
     val progressFraction: Float

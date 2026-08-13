@@ -54,3 +54,20 @@ dead discovery sweep, and surfaced a backend device-name bug now deployed to all
 Full playback path verified on the real Fire TV including seek and resume. Play submission needs
 Paras: versionCode is still 1, TV screenshots do not exist, and the data-safety/privacy/content
 attestations are his to make.
+
+## 2026-08-13 — Server playback-position sync (Room v8 -> v9)
+Local resume now syncs with the same `/media/{entryId}/position` + `/media/positions` backend
+contract the Android phone app already uses — ported the design (offline coalescing queue,
+`clientUpdatedAt` captured once and never recomputed, server owns conflict resolution), not the
+code. `WatchHistoryEntity` moved from a single-`uri` primary key to composite `(uri, sourceId)` —
+closes a real bug where two family profiles sharing this TV collided on one shared resume point
+for the same file. `entryId` now threads end-to-end from the backend's `/files/list` response
+through to `PlayerActivity` (was silently dropped before). Verified end-to-end on the real Fire
+TV: local Room row correct (had to pull `.db`+`.db-wal`+`.db-shm` together — WAL mode was hiding
+a fresh write from a naive single-file pull), and the position independently confirmed via a
+direct API login+read against the live Rock Pi. Full detail, including a ~2-hour dispatch hang
+that had to be killed and two gaps found only by hand-completing/compiling the result:
+`kb/session_logs.md`'s 2026-08-13 entry.
+**Not yet done:** the same "certificate changed unexpectedly" TOFU-repair UX that H-11
+(AiHomeCloud backend) is meant to eliminate — hit live during this session's testing, unrelated
+to today's change but a real signal this client needs H-11 client-side support eventually too.

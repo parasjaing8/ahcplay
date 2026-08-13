@@ -11,6 +11,9 @@ interface SourceDao {
     @Query("SELECT * FROM sources WHERE host = :host AND username = :username LIMIT 1")
     suspend fun getByHostAndUsername(host: String, username: String): SourceEntity?
 
+    @Query("SELECT * FROM sources WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): SourceEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(source: SourceEntity): Long
 
@@ -50,14 +53,14 @@ interface WatchHistoryDao {
     @Query("SELECT * FROM watch_history WHERE sourceId = :sourceId ORDER BY lastWatchedAt DESC LIMIT 20")
     fun getRecentBySource(sourceId: Long): Flow<List<WatchHistoryEntity>>
 
-    @Query("SELECT * FROM watch_history WHERE uri = :uri LIMIT 1")
-    suspend fun getByUri(uri: String): WatchHistoryEntity?
+    @Query("SELECT * FROM watch_history WHERE uri = :uri AND sourceId = :sourceId LIMIT 1")
+    suspend fun getByUriAndSource(uri: String, sourceId: Long): WatchHistoryEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entry: WatchHistoryEntity)
 
-    @Query("DELETE FROM watch_history WHERE uri = :uri")
-    suspend fun delete(uri: String)
+    @Query("DELETE FROM watch_history WHERE uri = :uri AND sourceId = :sourceId")
+    suspend fun delete(uri: String, sourceId: Long)
 
     @Query("DELETE FROM watch_history")
     suspend fun deleteAll()
@@ -88,5 +91,20 @@ interface PlaylistDao {
 
     @Query("SELECT * FROM playlist_item WHERE playlistId = :playlistId ORDER BY position ASC")
     fun getItems(playlistId: Long): Flow<List<PlaylistItemEntity>>
+}
+
+@Dao
+interface PendingPlaybackReportDao {
+    @Query("SELECT * FROM pending_playback_report")
+    suspend fun getAll(): List<PendingPlaybackReportEntity>
+
+    @Query("SELECT * FROM pending_playback_report WHERE sourceId = :sourceId")
+    suspend fun getForSource(sourceId: Long): List<PendingPlaybackReportEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(report: PendingPlaybackReportEntity)
+
+    @Query("DELETE FROM pending_playback_report WHERE entryId = :entryId AND sourceId = :sourceId")
+    suspend fun delete(entryId: Int, sourceId: Long)
 }
 

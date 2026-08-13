@@ -23,7 +23,8 @@ data class AhcFileItem(
     val path: String,
     @SerializedName("isDirectory") val isDirectory: Boolean,
     @SerializedName("sizeBytes") val sizeBytes: Long = 0,
-    @SerializedName("mimeType") val mimeType: String? = null
+    @SerializedName("mimeType") val mimeType: String? = null,
+    @SerializedName("entryId") val entryId: Int? = null
 )
 
 data class AhcFileListResponse(
@@ -72,6 +73,27 @@ data class AhcDeviceInfo(
     val displayName: String
 )
 
+data class AhcPlaybackPositionRequest(
+    val position: Double,
+    val duration: Double? = null,
+    @SerializedName("clientUpdatedAt") val clientUpdatedAt: Long
+)
+
+data class AhcPlaybackPositionAck(
+    val version: Int = 0,
+    val cleared: Boolean = false,
+    val applied: Boolean = false
+)
+
+data class AhcPlaybackPositionEntry(
+    @SerializedName("entryId") val entryId: Int,
+    val position: Double,
+    val duration: Double? = null,
+    @SerializedName("updatedAt") val updatedAt: Long = 0,
+    val version: Int = 0,
+    @SerializedName("clientUpdatedAt") val clientUpdatedAt: Long = 0
+)
+
 interface AhcApiService {
     // Identity probe. Unauthenticated by design on the server, and deliberately NOT
     // /api/v1/pair/qr — that one is administrative and loopback-only. See AhcRepository.
@@ -107,6 +129,16 @@ interface AhcApiService {
     // POST /api/v1/auth/login — profile-level auth; returns {accessToken, refreshToken}
     @POST("api/v1/auth/login")
     suspend fun loginWithProfile(@Body body: AhcLoginRequest): AhcLoginResponse
+
+    @PUT("api/v1/media/{entryId}/position")
+    suspend fun setPlaybackPosition(
+        @Header("Authorization") bearer: String,
+        @Path("entryId") entryId: Int,
+        @Body body: AhcPlaybackPositionRequest
+    ): AhcPlaybackPositionAck
+
+    @GET("api/v1/media/positions")
+    suspend fun getPlaybackPositions(@Header("Authorization") bearer: String): List<AhcPlaybackPositionEntry>
 }
 
 fun buildAhcRetrofit(baseUrl: String, client: OkHttpClient): AhcApiService =

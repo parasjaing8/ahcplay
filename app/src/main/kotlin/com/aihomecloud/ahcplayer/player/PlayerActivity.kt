@@ -16,7 +16,9 @@ import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.aihomecloud.ahcplayer.R
+import com.aihomecloud.ahcplayer.data.ahc.AhcRepository
 import com.aihomecloud.ahcplayer.data.db.AppDatabase
+import com.aihomecloud.ahcplayer.data.db.PendingPlaybackReportEntity
 import com.aihomecloud.ahcplayer.data.db.WatchHistoryEntity
 import kotlinx.coroutines.launch
 import org.videolan.libvlc.LibVLC
@@ -29,6 +31,7 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback, PlayerGestur
         const val EXTRA_URI = "extra_uri"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_SOURCE_ID = "extra_source_id"
+        const val EXTRA_ENTRY_ID = "extra_entry_id"
         private const val HIDE_CONTROLS_DELAY_MS = 4000L
         private const val HIDE_SEEK_INDICATOR_DELAY_MS = 1500L
         private const val SEEK_STEP_MS = 10_000L
@@ -66,6 +69,10 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback, PlayerGestur
     internal lateinit var uri: String
     internal lateinit var title: String
     private var sourceId: Long = 0L
+    private var entryId: Int = -1   // -1 = not indexed by the server / sync unavailable
+    private var syncHost: String? = null
+    private var syncPort: Int = 8443
+    private var syncUsername: String = ""
     private var resumePositionMs: Long = 0L
     private var surfaceReady = false
 
@@ -116,6 +123,7 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback, PlayerGestur
         title = intent.getStringExtra(EXTRA_TITLE)
             ?: uri.substringAfterLast('/').let { android.net.Uri.decode(it).substringBeforeLast('.') }
         sourceId = intent.getLongExtra(EXTRA_SOURCE_ID, 0L)
+        entryId = intent.getIntExtra(EXTRA_ENTRY_ID, -1)
 
         setContentView(R.layout.activity_player)
         bindViews()
@@ -163,9 +171,20 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback, PlayerGestur
         surfaceView.holder.addCallback(this)
 
         lifecycleScope.launch {
-            val existing = AppDatabase.get(this@PlayerActivity).watchHistoryDao().getByUri(uri)
+            val db = AppDatabase.get(this@PlayerActivity)
+            val existing = db.watchHistoryDao().getByUriAndSource(uri, sourceId)
             if (existing != null && existing.positionMs > 5_000L) {
                 resumePositionMs = existing.positionMs
+            }
+            val source = db.sourceDao().getById(sourceId)
+            if (source != null && source.sourceType == "AHC") {
+                syncHost = source.host
+                syncPort = source.port
+                syncUsername = source.username
+                if (entryId <= 0) {
+                    entryId = existing?.entryId ?: -1
+                }
+                flushPendingReports(this@PlayerActivity, db, sourceId, syncHost!!, syncPort, syncUsername)
             }
         }
 
@@ -284,22 +303,87 @@ class PlayerActivity : AppCompatActivity(), SurfaceHolder.Callback, PlayerGestur
         val pos = mediaPlayer.time
         val dur = mediaPlayer.length
         if (pos < 5_000L || dur <= 0L) return
+        val capturedAt = System.currentTimeMillis()
         lifecycleScope.launch {
-            AppDatabase.get(this@PlayerActivity).watchHistoryDao().upsert(
+            val db = AppDatabase.get(this@PlayerActivity)
+            db.watchHistoryDao().upsert(
                 WatchHistoryEntity(
-                    uri = uri,
-                    title = title,
-                    positionMs = pos,
-                    durationMs = dur,
-                    sourceId = sourceId
+                    uri = uri, sourceId = sourceId, title = title, positionMs = pos, durationMs = dur,
+                    entryId = entryId.takeIf { it > 0 },
+                    clientUpdatedAt = capturedAt,
+                    dirty = entryId > 0,
                 )
             )
+            if (entryId > 0 && syncHost != null) {
+                reportOrQueue(db, pos, dur, capturedAt)
+            }
+        }
+    }
+
+    /** Reports the given capture to the server; on a retryable failure, queues it for the next
+     *  flush (see [flushPendingReports]) rather than losing it. */
+    private suspend fun reportOrQueue(db: AppDatabase, posMs: Long, durMs: Long, capturedAt: Long) {
+        val repo = AhcRepository(this@PlayerActivity)
+        val result = repo.reportPlaybackPosition(
+            host = syncHost!!, port = syncPort, username = syncUsername,
+            entryId = entryId, positionSeconds = posMs / 1000.0, durationSeconds = durMs / 1000.0,
+            clientUpdatedAt = capturedAt,
+        )
+        when (result) {
+            is AhcRepository.PlaybackReportResult.Applied,
+            is AhcRepository.PlaybackReportResult.Discard -> {
+                db.pendingPlaybackReportDao().delete(entryId, sourceId)
+                // Nothing left to retry either way -- a Discard means the server already has
+                // something newer (or permanently rejected this report), which is exactly as
+                // resolved as an Applied write from this device's point of view.
+                db.watchHistoryDao().getByUriAndSource(uri, sourceId)?.let { row ->
+                    db.watchHistoryDao().upsert(row.copy(dirty = false))
+                }
+            }
+            is AhcRepository.PlaybackReportResult.RetryLater -> {
+                db.pendingPlaybackReportDao().upsert(
+                    PendingPlaybackReportEntity(
+                        entryId = entryId, sourceId = sourceId, uri = uri,
+                        positionSeconds = posMs / 1000.0, durationSeconds = durMs / 1000.0,
+                        clientUpdatedAt = capturedAt,
+                    )
+                )
+            }
         }
     }
 
     private fun clearHistory() {
+        val pos = if (::mediaPlayer.isInitialized) mediaPlayer.time else 0L
+        val dur = if (::mediaPlayer.isInitialized) mediaPlayer.length else 0L
+        val capturedAt = System.currentTimeMillis()
         lifecycleScope.launch {
-            AppDatabase.get(this@PlayerActivity).watchHistoryDao().delete(uri)
+            val db = AppDatabase.get(this@PlayerActivity)
+            // Report the true final position/duration before deleting locally -- the server's
+            // own 95%-of-duration rule decides whether this tombstones, this local delete is
+            // purely local bookkeeping and doesn't need to wait for the report to land.
+            if (entryId > 0 && syncHost != null && dur > 0L) {
+                reportOrQueue(db, pos, dur, capturedAt)
+            }
+            db.watchHistoryDao().delete(uri, sourceId)
+        }
+    }
+
+    /** Retries anything queued from an earlier failed sync attempt for this source. Called once
+     *  on player start -- a good, low-cost moment to catch up, not a background poller. */
+    private suspend fun flushPendingReports(
+        context: android.content.Context, db: AppDatabase, sourceId: Long,
+        host: String, port: Int, username: String,
+    ) {
+        val repo = AhcRepository(context)
+        for (pending in db.pendingPlaybackReportDao().getForSource(sourceId)) {
+            val result = repo.reportPlaybackPosition(
+                host = host, port = port, username = username,
+                entryId = pending.entryId, positionSeconds = pending.positionSeconds,
+                durationSeconds = pending.durationSeconds, clientUpdatedAt = pending.clientUpdatedAt,
+            )
+            if (result !is AhcRepository.PlaybackReportResult.RetryLater) {
+                db.pendingPlaybackReportDao().delete(pending.entryId, sourceId)
+            }
         }
     }
 

@@ -90,7 +90,18 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val continueWatching = db.watchHistoryDao().getRecent()
         .map { list ->
             list.filter { it.positionMs > 5000 && it.progressFraction < 0.95f }
-                .map { WatchHistory(it.uri.hashCode().toLong(), it.uri, it.title, it.positionMs, it.durationMs, it.sourceId, it.lastWatchedAt) }
+                .map {
+                    WatchHistory(
+                        id = it.uri.hashCode().toLong(),
+                        uri = it.uri,
+                        title = it.title,
+                        positionMs = it.positionMs,
+                        durationMs = it.durationMs,
+                        sourceId = it.sourceId,
+                        entryId = it.entryId,
+                        lastWatchedAt = it.lastWatchedAt,
+                    )
+                }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }

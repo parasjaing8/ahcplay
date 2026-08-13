@@ -245,3 +245,58 @@ lines above never to trust 26 for waking. It toggles both ways — it woke the F
 finished test run. Now `223` (SLEEP).
 
 Devices: Fire TV `Asleep`, tablet `Dozing`, no emulators.
+
+## 2026-08-13 - Server playback-position sync, ported from the phone client
+
+Local resume (Room, keyed by bare URI) gets a server side: `PUT /media/{entryId}/position` +
+`GET /media/positions`, the same backend contract the Android phone app already uses. Ported the
+design, not the code — phone app's `PlaybackSyncManager` pattern (coalescing offline queue keyed
+by entryId, `clientUpdatedAt` captured once and never recomputed on retry, server-side
+conflict resolution) adapted to this app's existing single-30s-timer save loop instead of adding
+a second one.
+
+**Room migration 8->9**: `WatchHistoryEntity` moves from a single `uri` primary key to composite
+`(uri, sourceId)` — a real, previously-latent bug: two profiles sharing this TV and watching the
+same file collided on one shared resume point. Each profile already gets its own `SourceEntity`
+row (id 1/2/3 for Paras/Prutha/Chai on the household board), so the fix was scoping by that id,
+not by a new username column. New `pending_playback_report` table is the offline retry queue.
+`entryId` now threads through `AhcFileItem` -> `BrowseItem` -> `WatchHistory` -> Intent extras ->
+`PlayerActivity` — the backend already attached it to every `/files/list` item; this app was
+silently dropping it (Gson ignores unmapped fields).
+
+**Implementation was dispatched, not hand-written** (`smart-dispatch` -> Groq/aider, per a
+~300-line file-by-file spec written after reading the phone client + backend contract in full).
+**The dispatch hung for ~2 hours in a `litellm.Timeout` retry loop against Groq** after finishing
+9 of 10 files — confirmed externally (process alive, near-zero CPU, ledger showing no new API
+calls in 2 hours, aider's own history file showing the timeout cascade) before killing it rather
+than continuing to wait on a guess. `PlayerActivity.kt` was left with `saveHistory()`/
+`clearHistory()` unconverted (still calling a DAO method the migration had already removed —
+would not have compiled) and a call to `flushPendingReports()` that didn't exist yet; finished
+that file by hand from the same spec rather than re-dispatching. Compiling then surfaced a second
+gap the dispatch never touched at all: `BrowseViewModel.kt` had a third positional `WatchHistory(...)`
+constructor call the investigation phase missed (only `HomeViewModel.kt`'s was found and
+converted to named args) — a stale-position bug from the same root cause the spec was written to
+prevent. Both fixed directly.
+
+**Verified end-to-end on the real Fire TV, not just `assembleDebug`** — and it caught a real
+instrumentation trap: a naive `adb pull` of `ahcplayer.db` alone showed *no* row for the freshly
+synced item, which looked like the feature was silently failing. Room's WAL mode was holding the
+write in `ahcplayer.db-wal`, not yet checkpointed into the main file — pulling all three files
+(`.db`/`.db-wal`/`.db-shm`) together showed the row was there all along. Confirmed for real:
+`entryId`, `clientUpdatedAt`, `positionMs` all populated correctly in Room, `pending_playback_report`
+empty (no retry needed), and the position round-tripped to the live Rock Pi and back — logged in
+as Prutha directly via the API and read `GET /media/positions` showing the exact position and
+timestamp the client had just sent. Also found and fixed one gap in my own hand-completion: the
+`dirty` flag never got reset to `false` after a successful sync, so it stuck at `true` forever
+(silently, since nothing reads it yet) — fixed and reconfirmed the same way.
+
+Also hit the exact TOFU-pinning scenario H-11 exists for, unprompted: an earlier cert reissue on
+Rock Pi (same day, different task — see the AiHomeCloud backend's H-11 work) invalidated this
+device's cached SPKI pin mid-session, "Certificate for this device changed unexpectedly — re-pair
+the device." This app's `AhcTls.kt` TOFU check has no relationship to H-11's identity-statement
+verification at all (neither Android client implements that yet) — worked around it for testing
+by clearing `ahc_tokens.xml` via `run-as` (preserves Room data, forces re-pair), but this is a
+live demonstration of exactly the UX regression H-11's client-side work is meant to prevent, on
+a second, independent client that will also need it.
+
+Device close-out: force-stop, `keyevent 223`, confirmed `mWakefulness=Asleep`, no lingering process.

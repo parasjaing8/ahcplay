@@ -250,9 +250,45 @@ class AhcRepository(context: Context) {
                     nasPathToSmb(host, item.path, smbShare),
                 isDirectory = item.isDirectory,
                 sizeBytes = item.sizeBytes,
-                mimeType = item.mimeType ?: ""
+                mimeType = item.mimeType ?: "",
+                entryId = item.entryId
             )
         }
+    }
+
+    sealed class PlaybackReportResult {
+        data class Applied(val ack: AhcPlaybackPositionAck) : PlaybackReportResult()
+        object RetryLater : PlaybackReportResult()   // IOException, HTTP 429, HTTP 5xx
+        object Discard : PlaybackReportResult()       // applied=false, or a permanent 4xx (401/403/404/422)
+    }
+
+    suspend fun reportPlaybackPosition(
+        host: String, port: Int, username: String,
+        entryId: Int, positionSeconds: Double, durationSeconds: Double?, clientUpdatedAt: Long,
+    ): PlaybackReportResult {
+        val token = getToken(host, username) ?: return PlaybackReportResult.Discard
+        return try {
+            val ack = apiFor(host, port).setPlaybackPosition(
+                "Bearer $token", entryId,
+                AhcPlaybackPositionRequest(positionSeconds, durationSeconds, clientUpdatedAt)
+            )
+            if (ack.applied) PlaybackReportResult.Applied(ack) else PlaybackReportResult.Discard
+        } catch (e: retrofit2.HttpException) {
+            if (e.code() == 429 || e.code() >= 500) PlaybackReportResult.RetryLater else PlaybackReportResult.Discard
+        } catch (e: java.io.IOException) {
+            PlaybackReportResult.RetryLater
+        } catch (e: Exception) {
+            Log.w(TAG, "reportPlaybackPosition failed: ${e.message}")
+            PlaybackReportResult.Discard
+        }
+    }
+
+    suspend fun fetchPlaybackPositions(host: String, port: Int, username: String): List<AhcPlaybackPositionEntry> = try {
+        val token = getToken(host, username) ?: return emptyList()
+        apiFor(host, port).getPlaybackPositions("Bearer $token")
+    } catch (e: Exception) {
+        Log.w(TAG, "fetchPlaybackPositions failed: ${e.message}")
+        emptyList()
     }
 
     companion object {

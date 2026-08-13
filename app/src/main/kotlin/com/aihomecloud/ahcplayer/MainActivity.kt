@@ -57,12 +57,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             AhcPlayerTheme {
                 AppNavHost(
-                    onPlayVideo = { uri, title, sourceId ->
+                    onPlayVideo = { uri, title, sourceId, entryId ->
                         startActivity(
                             Intent(this, PlayerActivity::class.java)
                                 .putExtra(PlayerActivity.EXTRA_URI, uri)
                                 .putExtra(PlayerActivity.EXTRA_TITLE, title)
                                 .putExtra(PlayerActivity.EXTRA_SOURCE_ID, sourceId)
+                                .putExtra(PlayerActivity.EXTRA_ENTRY_ID, entryId ?: -1)
                         )
                     },
                     onFinish = { finish() }
@@ -94,7 +95,7 @@ sealed class Screen {
 }
 
 @Composable
-fun AppNavHost(onPlayVideo: (uri: String, title: String, sourceId: Long) -> Unit, onFinish: () -> Unit) {
+fun AppNavHost(onPlayVideo: (uri: String, title: String, sourceId: Long, entryId: Int?) -> Unit, onFinish: () -> Unit) {
     val context = LocalContext.current
     val ahcRepo = remember { AhcRepository(context) }
 
@@ -165,7 +166,7 @@ fun AppNavHost(onPlayVideo: (uri: String, title: String, sourceId: Long) -> Unit
                     else navigate(Screen.Setup(host.address))
                 },
                 onSettings = { navigate(Screen.Settings) },
-                onResume = { history -> onPlayVideo(history.uri, history.title, history.sourceId) }
+                onResume = { history -> onPlayVideo(history.uri, history.title, history.sourceId, history.entryId) }
             )
             is Screen.Discover -> DiscoverScreen(
                 onDeviceSelected = { host, port, name -> navigate(Screen.ProfileSelect(host, port, name)) },

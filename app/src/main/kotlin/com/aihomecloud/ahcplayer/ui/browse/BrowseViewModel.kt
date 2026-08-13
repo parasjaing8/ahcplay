@@ -70,7 +70,18 @@ class BrowseViewModel(app: Application) : AndroidViewModel(app) {
                 db.watchHistoryDao().getRecentBySource(sourceId).collect { list ->
                     _continueWatching.value = list
                         .filter { it.positionMs > 5000 && it.durationMs > 0 && it.positionMs.toFloat() / it.durationMs < 0.95f }
-                        .map { WatchHistory(0L, it.uri, it.title, it.positionMs, it.durationMs, it.sourceId, it.lastWatchedAt) }
+                        .map {
+                            WatchHistory(
+                                id = 0L,
+                                uri = it.uri,
+                                title = it.title,
+                                positionMs = it.positionMs,
+                                durationMs = it.durationMs,
+                                sourceId = it.sourceId,
+                                entryId = it.entryId,
+                                lastWatchedAt = it.lastWatchedAt,
+                            )
+                        }
                 }
             }
         }
